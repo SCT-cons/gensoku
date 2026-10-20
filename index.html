@@ -285,7 +285,7 @@ input.qpi{margin-bottom:6px}
 <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="xisw" style="width:20px;height:20px;flex:0 0 20px"> 座標の並びが「東 北」(X=東)のファイル</label>
 <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="xifl" style="width:20px;height:20px;flex:0 0 20px"> 円弧・クロソイドの右/左を反対にして読む</label></div></details></div>
 
-<div class="c" data-rs="h"><h2>平面線形・測点・幅杭</h2><div style="margin-bottom:8px"><label>測点の表記方式(発注機関)</label><select id="stmode"><option value="no">国交省・一般道 (No. / ピッチ単位)</option><option value="sta">NEXCO・自専道 (STA. / 100m単位)</option></select></div><div class="r" style="align-items:flex-end"><div><label>ステーションピッチ(m)</label><input class="n" id="pi" value="20" list="pitches"></div><div><label>中間ピッチ(m)</label><input class="n" id="pmid" placeholder="例: 10"></div><div><label>始点追加距離</label><input class="n" id="sa" value="0"></div></div><div class="m" style="margin:4px 0 8px">計算の間隔です。ステーションピッチ=No.の間隔、中間ピッチ=間に追加する点の間隔(空欄=追加なし)。</div><label>中間点を座標管理に登録するときの開始点番(空欄=最後の番号の次から)</label><input class="n" id="rgn" placeholder="例: 101"><datalist id="pitches"><option value="5"><option value="10"><option value="20"><option value="25"><option value="50"></datalist>
+<div class="c" data-rs="h"><h2>平面線形・測点・幅杭</h2><div style="margin-bottom:8px"><label>測点の表記方式(発注機関)</label><select id="stmode"><option value="no">国交省・一般道 (No. / ピッチ単位)</option><option value="sta">NEXCO・自専道 (STA. / 100m単位)</option></select></div><div class="r" style="align-items:flex-end"><div><label>ステーションピッチ(m)</label><input class="n" id="pi" value="20" list="pitches"></div><div><label>中間ピッチ(m)</label><input class="n" id="pmid" placeholder="例: 10"></div><div><label>始点追加距離</label><input class="n" id="sa" value="0"></div></div><div style="margin:0 0 8px"><label>測点の食い違い(ふつうは空)</label><input id="peq" placeholder="例: 1234.567:1.579" autocomplete="off"><div class="m" style="margin-top:4px">測点の数え方が途中で飛ぶ道路用。「追加距離:ずれ(m)」で入れます。その追加距離より先の測点が、ずれの分だけ進みます(戻すときはマイナス)。複数ならカンマで区切ります。</div></div><div class="m" style="margin:4px 0 8px">計算の間隔です。ステーションピッチ=No.の間隔、中間ピッチ=間に追加する点の間隔(空欄=追加なし)。</div><label>中間点を座標管理に登録するときの開始点番(空欄=最後の番号の次から)</label><input class="n" id="rgn" placeholder="例: 101"><datalist id="pitches"><option value="5"><option value="10"><option value="20"><option value="25"><option value="50"></datalist>
 <label>線形の入力方式</label><select id="rmode"><option value="2">要素法簡易バージョン</option><option value="1">要素法詳細バージョン</option><option value="0">IP法</option></select>
 <div id="ipb"><label>緩和曲線の指定</label><select id="ipa"><option value="A">A値(R,A)</option><option value="L">長さLs(R,Ls)</option></select><label>IP列(上から順に 1行1点: 点番,半径R,A値。BP・EPはRなし。Aなし=単曲線)</label><textarea id="ip" placeholder="IP0&#10;IP1,50,20&#10;IP2,80&#10;IP3"></textarea><button class="s" id="ipf" style="margin-top:6px">点一覧の順に入れる</button><label>点一覧から1点ずつ追加</label><select id="ipsel"></select></div><div id="elb" style="display:none"><label>要素点(上から順に。各点の座標・タイプ・R・Aを入力。点名が点一覧にあれば座標は自動)</label><div id="elr"></div>
 <div class="r" style="margin-top:6px"><button class="s" id="a1">＋要素点</button><button class="s" id="a4">例</button><button class="s" id="a5">全消去</button></div>
@@ -588,15 +588,20 @@ let LA=null,qres=null;
 function calcReset(){LA=null;route=[];CADR=null;qres=null;["ro","qt"].forEach(i=>{const e=$(i);if(e)e.style.display="none"})}
 /* 測点は、ミリ(小数3桁)まで表示する。ミリ未満を丸めた結果が次の測点ちょうどになる場合も正しく扱う */
 const isSta=()=>S.stmode==="sta";   /* 測点の表記: 国交省 No.(ピッチ単位) / NEXCO STA.(100m単位) */
-const stn=(x,p,d=3)=>{const sc=Math.pow(10,d),eps=.5/sc,q=Math.round(x*sc)/sc;
+/* 測点の食い違い: 追加距離 a より先の測点表示を o(m) ずらす。内部の距離(追加距離)は変えない */
+let EQC=["",[]];const EQL=()=>{const e=$("peq"),t=e?e.value:"";if(EQC[0]!==t){const a=[];String(t).normalize("NFKC").replace(/(-?\d+(?:\.\d+)?)\s*[:：]\s*([+-]?\d+(?:\.\d+)?)/g,(m,x,y)=>{a.push({a:+x,o:+y});return m});a.sort((p,q)=>p.a-q.a);EQC=[t,a]}return EQC[1]};
+const LBL=x=>{let o=0;for(const e of EQL())if(x>e.a+1e-6)o+=e.o;return x+o};
+const UNL=L=>{const E=EQL();let o=0,best=null;const b=[-1e18,...E.map(e=>e.a),1e18];for(let i=0;i<b.length-1;i++){if(i>0)o+=E[i-1].o;const s=L-o;if(s>b[i]+(i?1e-6:-1e-9)&&s<=b[i+1]+1e-6){best=s;break}}return best==null?L:best};
+const stPts=(s0,send,u)=>{const E=EQL(),b=[-1e18,...E.map(e=>e.a),1e18],out=[];let o=0;for(let i=0;i<b.length-1;i++){if(i>0)o+=E[i-1].o;const lo=Math.max(b[i],s0),hi=Math.min(b[i+1],send);if(lo>hi)continue;for(let k=Math.ceil((lo+o)/u-1e-9);k*u-o<=hi+1e-7;k++){const x=k*u-o;if(i>0&&x<=b[i]+1e-6)continue;if(x<s0-1e-9)continue;out.push(x)}}return out};
+const stn=(x,p,d=3)=>{x=LBL(x);const sc=Math.pow(10,d),eps=.5/sc,q=Math.round(x*sc)/sc;
  if(isSta()){let k=Math.floor(q/100+1e-9),r=Math.round((q-k*100)*sc)/sc;if(r>=100-eps){k++;r=0}const ri=Math.round(r);return Math.abs(r-ri)<eps?`STA.${k}+${String(ri).padStart(2,"0")}`:`STA.${k}+${r.toFixed(d).padStart(d+3,"0")}`}
  let k=Math.floor(q/p+1e-9),r=Math.round((q-k*p)*sc)/sc;if(r>=p-eps){k++;r=0}return r<eps?`No.${k}`:`No.${k}+${r.toFixed(d)}`};
 /* 計算書の「ステーション」欄用(No.: 「5 +   3.200」 / STA.: 「STA.1 + 03.200」) */
-const stnSheet=(x,p)=>{const q=Math.round(x*1000)/1000,u=isSta()?100:p;let k=Math.floor(q/u+1e-9),r=Math.round((q-k*u)*1000)/1000;if(r>=u-5e-4){k++;r=0}return isSta()?`STA.${k} + ${r.toFixed(3).padStart(6,"0")}`:`${k} + ${r.toFixed(3).padStart(7)}`};
+const stnSheet=(x,p)=>{x=LBL(x);const q=Math.round(x*1000)/1000,u=isSta()?100:p;let k=Math.floor(q/u+1e-9),r=Math.round((q-k*u)*1000)/1000;if(r>=u-5e-4){k++;r=0}return isSta()?`STA.${k} + ${r.toFixed(3).padStart(6,"0")}`:`${k} + ${r.toFixed(3).padStart(7)}`};
 function outRoute(sg,key,s0,send,pitch,info,evf){route=[];
  const at=x=>evf(sg.find(g=>x>=g.s0-1e-7&&x<=g.s1+1e-7)||sg[sg.length-1],x);LA={at,s0,send,pitch,sg,evf,key};if(CHK&&$("rmode").value=="1"){let mx=0,c=0;CHK.forEach(q=>{if(q.s>=s0-1e-6&&q.s<=send+1e-6){const p=at(q.s);mx=Math.max(mx,Math.hypot(p.x-q.x,p.y-q.y));c++}});if(c)info.push(`取込データとの検算: ${c}点 最大差 ${f(mx*1000,1)}mm`)}
- const st=new Map();for(let k=Math.ceil(s0/pitch-1e-9);k*pitch<=send+1e-7;k++)st.set(Math.round(k*pitch*1e5),null);
- {const mid=num($("pmid").value)||0;if(mid>0&&Math.abs(mid-pitch)>1e-9)for(let k=Math.ceil(s0/mid-1e-9);k*mid<=send+1e-7;k++){const kk=Math.round(k*mid*1e5);if(!st.has(kk))st.set(kk,null)}}
+ const st=new Map();stPts(s0,send,pitch).forEach(x=>st.set(Math.round(x*1e5),null));
+ {const mid=num($("pmid").value)||0;if(mid>0&&Math.abs(mid-pitch)>1e-9)stPts(s0,send,mid).forEach(x=>{const kk=Math.round(x*1e5);if(!st.has(kk))st.set(kk,null)})}
  key.forEach(([x,nm])=>st.set(Math.round(x*1e5),nm));const km=new Map(key.map(([x,nm,mt])=>[Math.round(x*1e5),mt])),zf=zFn(),zz=x=>{const v=zf?zf(x):null;return v==null?0:v};vInfo().forEach(t=>info.push(t));
  const ofBad=ofSignBad($("of").value);if(ofBad)info.push("⚠ "+OF_MSG+"(幅杭は出していません)");const offs=ofBad?[]:[...$("of").value.normalize("NFKC").matchAll(/([LR])\s*(\d+(?:\.\d+)?)/gi)].map(m=>[m[1].toUpperCase(),+m[2]]);
  [...st.keys()].sort((a,b)=>a-b).forEach(k=>{const x=k/1e5,p=at(x),name=st.get(k)||stn(x,pitch);
@@ -686,7 +691,7 @@ const blurEdit=()=>{const a=document.activeElement;if(a&&a.blur&&a.closest&&a.cl
 function flipRun(run,kp,kn){const n=run.length;let best=0,bs=Infinity,s0=0;for(let m=0;m<(1<<n);m++){const ks=run.map((e,i)=>(m>>i&1)?{k1:e.k2,k2:e.k1}:{k1:e.k1,k2:e.k2});let sc=relMis(kp,ks[0].k1)+relMis(ks[n-1].k2,kn);for(let i=0;i<n-1;i++)sc+=relMis(ks[i].k2,ks[i+1].k1);if(m==0)s0=sc;if(sc<bs-1e-9){bs=sc;best=m}}return bs<s0-0.5?best:0}
 const HINT_S="直線 → 曲線(だんだん曲がり始める)。R・Aは曲線側の値です",HINT_E="曲線 → 直線(だんだん真っすぐに戻る)。R・Aは曲線側の値です";
 /* 要素法: 各要素点の座標+タイプ+R/Aから線形を復元(福井コン等の「エレメント法」と同じ入力) */
-const elemCalc=()=>{const er=t=>{$("re").textContent=t};er("");calcReset();
+var LASTINFO=[];const elemCalc=()=>{const er=t=>{$("re").textContent=t};er("");calcReset();
  const E=S.ep.map(r=>{let X=num(r.x),Y=num(r.y);if((X===null||Y===null)&&(r.p||r.n)){const p=byNo(r.p)||byNo(r.n);if(p){X=p.x;Y=p.y}}return{...r,X,Y,R1:num(r.r1),R2:num(r.r2),A:num(r.a)}});
  if(E.length<2){er("要素点を2行以上入力してください");return}
  const bad=E.findIndex(e=>e.X===null||e.Y===null);if(bad>=0){er(`${bad+1}行目: 座標を入力してください`);return}
@@ -710,14 +715,14 @@ const elemCalc=()=>{const er=t=>{$("re").textContent=t};er("");calcReset();
   info.push(`${i}. ${E[i-1].n||""}→${e.n||""} ${ty} L=${f(L,3)}${gap>0.005?` ⚠終点との差 ${f(gap*1000,0)}mm`:""}`);
   s+=L;key.push([s,e.n||`P${i+1}`,{p:e.p,t:ty,d:ty=="直線"?"":sn>0?"右":"左",r1:e.R1>0&&ty!="終了クロソイド"?e.R1:0,r2:e.R2>0&&(ty=="終了クロソイド"||ty=="卵型クロソイド")?e.R2:0,a:ty.includes("クロソイド")?e.A:0}])}
  if(flipped.length){info.unshift(`⚠ ${flipped.map(n=>n+"行目").join("・")}: 開始クロソイドと終了クロソイドが逆だったので、入れ替えて計算しました(表の種別も直しました)`);sv();rEl();toast(`${flipped.map(n=>n+"行目").join("・")}の開始/終了クロソイドを入れ替えました`)}
- EPST=[s0,...sg.map(g=>g.s1)];stUi();outRoute(sg,key,s0,s,pitch,info,ev2)};
+ EPST=[s0,...sg.map(g=>g.s1)];stUi();LASTINFO=info;outRoute(sg,key,s0,s,pitch,info,ev2)};
 const ipCalc=$("rg").onclick;$("rg").onclick=()=>{const m=$("rmode").value;m=="1"?elemCalc():m=="2"?mpCalc():ipCalc()};
 $("rmode").onchange=()=>{const m=$("rmode").value;$("ipb").style.display=m=="0"?"":"none";$("elb").style.display=m=="1"?"":"none";$("mpb").style.display=m=="2"?"":"none"};
 
 
 /* ===== 取り込み: SIMA(.sim) / 中心点座標計算(PDF) ===== */
 let IMP=[],CHK=null;
-function parseSIMA(t){const o=[];t.split(/\r?\n/).forEach(l=>{if(!/^A01/.test(l))return;const c=l.split(",").map(x=>x.trim()),x=num(c[3]||""),y=num(c[4]||"");if(!c[1]||x===null||y===null)return;o.push({n:c[1],m:c[2]||"",x,y,z:num(c[5]||"")||0})});return o}
+function parseSIMA(t){const o=[];t.split(/\r?\n/).forEach(l=>{l=l.replace(/^\s*"|"\s*$/g,"");if(!/^A01/.test(l))return;const c=l.split(",").map(x=>x.trim()),x=num(c[3]||""),y=num(c[4]||"");if(!c[1]||x===null||y===null)return;o.push({n:c[1],m:c[2]||"",x,y,z:num(c[5]||"")||0})});return o}
 function parseCL(raw){const T=raw.normalize("NFKC").replace(/\s+/g," "),al=[];let cur=null,el=null;
  const re=/中心線名\(([^)]*)\)|(\d+) ?≪ ?([^≫]+?) ?≫ ([\s\S]*?)(?=NO ステーション)|(\d{4,5}) (\d+) \+ (\d+\.\d+) (?:(\d+\.\d+) )?(\d+\.\d+) (-?\d+\.\d+) (-?\d+\.\d+) (\d+)-(\d+)-(\d+)/g;
  for(const m of T.matchAll(re)){
@@ -791,9 +796,9 @@ $("if1").onchange=async()=>{const f0=$("if1").files[0];if(!f0)return;imsg("読�
 
 
 /* ===== 線形の保存 / 現場データ(.sks.json) ===== */
-const curRt=()=>({vps:vpsSync(),vpi:S.vpi||0,mp:JSON.parse(JSON.stringify(S.mp)),mpaz:S.mpaz||$("mpaz").value||"",vp:JSON.parse(JSON.stringify(S.vp)),mode:$("rmode").value,ep:JSON.parse(JSON.stringify(S.ep)),ip:$("ip").value,ipa:$("ipa").value,pi:$("pi").value,pmid:$("pmid").value,sa:$("sa").value,of:$("of").value,chk:CHK});
+const curRt=()=>({vps:vpsSync(),vpi:S.vpi||0,mp:JSON.parse(JSON.stringify(S.mp)),mpaz:S.mpaz||$("mpaz").value||"",vp:JSON.parse(JSON.stringify(S.vp)),mode:$("rmode").value,ep:JSON.parse(JSON.stringify(S.ep)),ip:$("ip").value,ipa:$("ipa").value,pi:$("pi").value,pmid:$("pmid").value,peq:($("peq")||{}).value||"",sa:$("sa").value,of:$("of").value,chk:CHK});
 function rRt(sel){$("rtsel").innerHTML=S.routes.length?S.routes.map(r=>`<option value="${r.id}">${esc(r.name)}(${r.mode=="2"?"要素法簡易バージョン "+(r.mp||[]).length+"行":r.mode=="1"?"要素法詳細バージョン "+(r.ep||[]).length+"点":"IP法"})</option>`).join(""):`<option value="">保存した線形はありません</option>`;if(sel)$("rtsel").value=sel;rVsl(sel);rExSel()}
-function loadRt(r){S.vps=JSON.parse(JSON.stringify(r.vps||[]));S.vpi=r.vpi||0;S.mp=JSON.parse(JSON.stringify(r.mp||[]));S.mpaz=r.mpaz||"";if($("mpaz"))$("mpaz").value=S.mpaz;mpAzHint();rMp();S.vp=JSON.parse(JSON.stringify(r.vp||[]));rVp();S.ep=JSON.parse(JSON.stringify(r.ep||[]));$("ip").value=r.ip||"";$("ipa").value=r.ipa||"A";$("pi").value=r.pi||"20";$("pmid").value=r.pmid||"";$("sa").value=r.sa||"0";$("of").value=r.of||"";CHK=r.chk||null;
+function loadRt(r){S.vps=JSON.parse(JSON.stringify(r.vps||[]));S.vpi=r.vpi||0;S.mp=JSON.parse(JSON.stringify(r.mp||[]));S.mpaz=r.mpaz||"";if($("mpaz"))$("mpaz").value=S.mpaz;mpAzHint();rMp();S.vp=JSON.parse(JSON.stringify(r.vp||[]));rVp();S.ep=JSON.parse(JSON.stringify(r.ep||[]));$("ip").value=r.ip||"";$("ipa").value=r.ipa||"A";$("pi").value=r.pi||"20";$("pmid").value=r.pmid||"";if($("peq"))$("peq").value=r.peq||"";$("sa").value=r.sa||"0";$("of").value=r.of||"";CHK=r.chk||null;
  $("rmode").value=r.mode||"0";$("rmode").onchange();$("rtn").value=r.name||"";sv();rEl();
  if(r.mode=="1"){if(S.ep.length>1)elemCalc()}else if(r.mode=="2"){if(S.mp.length>1)mpCalc()}else if((r.ip||"").trim())ipCalc()}
 $("rts").onclick=()=>{const name=$("rtn").value.trim();if(!name){toast("線形名を入れてください(例: 本線)");return}
@@ -827,7 +832,7 @@ async function saveSiteFile(){const json=siteJson(),d=JSON.parse(json),nm=(d.sit
  $("sitetx").style.display="";$("sitepaste").style.display="";$("sitetx").value=json;return"自動保存できないため、枠の内容をコピーして保存してください"}
 /* 前のジョブの作業状態(器械設置・線形・結果・図の表示など)を全て消す。ジョブを開く/新規のときに使う */
 function resetWork(){LCDATA=null;LCRUNS=null;RES=null;SETUP=null;LA=null;route=[];EPST=[];CHK=null;qres=null;CADR=null;CADT=null;CADC=null;LASTTR=null;trOut=[];COP=null;CTP=[];CBR=null;HP=2;CK.clear();
- ["ih","ih3","bh","iz","sa1","sa2","sa3","tsn","tof","mh","ov","od","ol","bdm","bvm","rtn","ip","of","pmid","pq","exn","cosn"].forEach(i=>{const e=$(i);if(e)e.value=""});
+ ["ih","ih3","bh","iz","sa1","sa2","sa3","tsn","tof","mh","ov","od","ol","bdm","bvm","rtn","ip","of","pmid","peq","pq","exn","cosn"].forEach(i=>{const e=$(i);if(e)e.value=""});
  ["so","sb","st","ta","tb","tc","td","vsl","exsel","cos","rtsel","sitelib"].forEach(i=>{const e=$(i);if(e)e.value=""});
  ["ro","so1","so2","rso","sus","bchk","bchk2","re","te","to","vlki","vsmsg","ctrc","cbrc","corc","cte","cbe","coe","exinfo","rtm","cinfo","lcr"].forEach(i=>{const e=$(i);if(e)e.innerHTML=""});   /* 結果の表示だけの欄を空にする(入力欄を含む欄は消さない) */
  ["ro","qt","to"].forEach(i=>{const e=$(i);if(e)e.style.display="none"});$("sa").value="0";$("pi").value="20";S.rsd="2";S.mpsta=false;S.mpaz="";S.kd=null;KDM=null;try{ctForm();cbForm()}catch(e){}try{kdRender()}catch(e){}}
@@ -982,9 +987,9 @@ async function dxfNet(){const items=trNetItems();if(!items.length){toast("網図
 
 /* ===== 縦断(PVI・放物線縦曲線) ===== */
 function stParse(t){t=String(t||"").normalize("NFKC").trim();if(!t)return null;const pitch=num($("pi").value)||20;   /* No.5+3.2 / STA.1+20 / 5+3.2 / 追加距離 すべて読む */
- let m=t.match(/^STA\.?\s*(-?\d+)(?:\s*\+\s*(\d+(?:\.\d+)?))?$/i);if(m)return+m[1]*100+(+(m[2]||0));
- m=t.match(/^No\.?\s*(-?\d+)(?:\s*\+\s*(\d+(?:\.\d+)?))?$/i);if(m)return+m[1]*pitch+(+(m[2]||0));
- m=t.match(/^(-?\d+)\s*\+\s*(\d+(?:\.\d+)?)$/);if(m)return+m[1]*(isSta()?100:pitch)+(+m[2]);
+ let m=t.match(/^STA\.?\s*(-?\d+)(?:\s*\+\s*(\d+(?:\.\d+)?))?$/i);if(m)return UNL(+m[1]*100+(+(m[2]||0)));
+ m=t.match(/^No\.?\s*(-?\d+)(?:\s*\+\s*(\d+(?:\.\d+)?))?$/i);if(m)return UNL(+m[1]*pitch+(+(m[2]||0)));
+ m=t.match(/^(-?\d+)\s*\+\s*(\d+(?:\.\d+)?)$/);if(m)return UNL(+m[1]*(isSta()?100:pitch)+(+m[2]));
  return isN(t)?+t:null}
 function vpts(){return S.vp.map(r=>({s:stParse(r.s),z:num(r.z||""),L:num(r.L||"")||0})).filter(r=>r.s!==null&&r.z!==null).sort((a,b)=>a.s-b.s)}
 function zFn(){const P=vpts();if(P.length<2)return null;const g=[];for(let i=0;i<P.length-1;i++){const d=P[i+1].s-P[i].s;if(d<=0)return null;g.push((P[i+1].z-P[i].z)/d)}
@@ -1097,28 +1102,45 @@ $("exjx").onclick=()=>exGo(()=>[{name:`${rtName().replace(/\s+/g,"_")}_J-LandXML
 $("exjx2").onclick=()=>exGo(()=>{if(vpts().length<2){toast("縦断(PVIを2点以上)を入力してください");return null}if(vlkState().k=="noovl"){toast("縦断の追加距離が平面線形と重なっていません");return null}return[{name:`${rtName().replace(/\s+/g,"_")}_J-LandXML_平面縦断.xml`,text:landXml(true,false,true)}]});
 /* ===== XML(LandXML / 国総研J-LandXML)の線形読み込み ===== */
 const xnum=v=>{if(v==null)return null;v=String(v).trim();if(/^[+-]?inf/i.test(v))return Infinity;const n=parseFloat(v);return isNaN(n)?null:n};
-/* SIMA共通フォーマットの路線データ: F00(路線)・F03(起点追加距離,ピッチ)・B01(点)・C01(円弧 R)・C02(クロソイド A,R始,R終)。点の座標はA01から */
-function simaRoutes(text,o){o=o||{};const L=text.split(/\r?\n/),sp=l=>l.split(",").map(s=>s.trim()),P={},res=[],warn=[];let cur=null,gp=0,gm=0;
+/* SIMA共通フォーマットの路線データ: F00(路線)・F03(起点の通し距離)・B01(点)・B03(その点の通し距離)・C01(円弧 R)・C02(クロソイド A,R始,R終)。点の座標はA01から */
+function simaRoutes(text,o){o=o||{};const L=text.split(/\r?\n/).map(l=>l.replace(/^\s*"|"\s*$/g,"")),sp=l=>l.split(",").map(s=>s.trim()),P={},res=[],warn=[],num=v=>{const n=parseFloat(v);return isNaN(n)?0:n};let cur=null,gp=0,gm=0;
  L.forEach(l=>{if(l.slice(0,3)==="A01"){const t=sp(l),x=parseFloat(t[3]),y=parseFloat(t[4]);if(!isNaN(x)&&!isNaN(y))P[t[1]]={n:t[2],x:o.swap?y:x,y:o.swap?x:y}}});
- const SRE=/^(?:NO|STA)\.?\s*(\d+)\s*\+\s*(\d+(?:\.\d+)?)\s*$/i,same=(a,b)=>Math.abs(a-b)<=1e-6*Math.max(1,Math.abs(a),Math.abs(b)),
- merge=E=>{if(E.every(e=>!e))return null;const n=v=>parseFloat(v),e0=E[0];
-  if(E.every(e=>e&&e[0]==="C01"&&same(n(e[2]),n(e0[2]))))return e0;
-  if(E.every((e,i)=>e&&e[0]==="C02"&&same(n(e[1]),n(e0[1]))&&(!i||same(n(E[i-1][3]),n(e[2])))))return["C02",e0[1],e0[2],E[E.length-1][3]];
+ const SRE=/^(?:NO|STA)\.?\s*(\d+)(?:\s*\+\s*(\d+(?:\.\d+)?))?\s*$/i,same=(a,b)=>Math.abs(a-b)<=1e-6*Math.max(1,Math.abs(a),Math.abs(b)),
+ /* 区間の長さ(通し距離の逆算用) */
+ elen=(p,q,e)=>{const c=Math.hypot(p.x-q.x,p.y-q.y);if(!e)return c;if(e[0]==="C01"){const R=Math.abs(num(e[2]));return R>c/2?2*R*Math.asin(c/2/R):c}
+  if(e[0]==="C02"){const A=num(e[1]),a=num(e[2]),b=num(e[3]);return A*A*Math.abs((b?1/b:0)-(a?1/a:0))}return c},
+ /* 外す点が、まとめる要素の上に本当に乗っているか(折れ点を消さないため) */
+ onEl=(ps,e)=>{const p=ps[0],q=ps[ps.length-1],mid=ps.slice(1,-1);if(!mid.length)return true;
+  if(!e){const d=Math.hypot(q.x-p.x,q.y-p.y)||1;return mid.every(m=>Math.abs(((q.x-p.x)*(p.y-m.y)-(p.x-m.x)*(q.y-p.y))/d)<0.003)}
+  if(e[0]==="C01"){const R=Math.abs(num(e[2])),c=Math.hypot(q.x-p.x,q.y-p.y);if(!(R>c/2))return false;const h=Math.sqrt(R*R-c*c/4),ux=(q.x-p.x)/c,uy=(q.y-p.y)/c,mx=(p.x+q.x)/2,my=(p.y+q.y)/2;
+   return[1,-1].some(sg=>{const cx=mx-uy*h*sg,cy=my+ux*h*sg;return mid.every(m=>Math.abs(Math.hypot(m.x-cx,m.y-cy)-R)<0.003)})}
+  return true},
+ merge=E=>{if(E.every(e=>!e))return null;const e0=E[0];
+  if(E.every(e=>e&&e[0]==="C01"&&same(num(e[2]),num(e0[2]))))return e0;
+  if(E.every((e,i)=>e&&e[0]==="C02"&&same(num(e[1]),num(e0[1]))&&(!i||same(num(E[i-1][3]),num(e[2])))))return["C02",e0[1],e0[2],E[E.length-1][3]];
   return undefined};
  const done=()=>{if(!cur)return;const c=cur;cur=null;const rows=[];let skip=0,dup=0,mg=0;
+  const p0=P[c.pts[0]&&c.pts[0].id],p1=P[c.pts[1]&&c.pts[1].id];
+  if(c.sta==null){c.sta=0;if(p0&&p1&&c.pts[1].st!=null){c.sta=c.pts[1].st-elen(p0,p1,c.pts[0].c);warn.push(`「${c.name}」: 起点の通し距離(F03)がないため、次の点の通し距離から逆算して${f(c.sta,4)}mにしました`)}}
   /* 測点ごとに刻んだ路線(NO.255+65 のような点が並ぶもの)は、測点の点を外して要素点だけにまとめる。測点名と通し距離からピッチも読み取る */
-  const pv={};c.pts.forEach(b=>{const m=SRE.exec(b.nm||"");if(m&&b.st!=null&&+m[1]>0){const p=(b.st-parseFloat(m[2]))/+m[1],r=Math.round(p);if(r>0&&Math.abs(p-r)<0.01)pv[r]=(pv[r]||0)+1}});
+  const pv={};c.pts.forEach(b=>{const m=SRE.exec(b.nm||"");if(m&&b.st!=null&&+m[1]>0){const p=(b.st-num(m[2]))/+m[1],r=Math.round(p);if(r>0&&Math.abs(p-r)<0.01)pv[r]=(pv[r]||0)+1}});
   const pk=Object.keys(pv).sort((a,b)=>pv[b]-pv[a])[0];if(pk&&!c.pitch)c.pitch=+pk;if(pk&&!gp)gp=+pk;
   {let md=0;for(let i=1;i<c.pts.length;i++){const a=c.pts[i-1],b=c.pts[i];if(a.st!=null&&b.st!=null&&SRE.test(a.nm||"")&&SRE.test(b.nm||"")){const d=b.st-a.st;if(d>0.5&&(!md||d<md))md=d}}
    if(md&&pk&&md<+pk&&Math.abs(+pk/md-Math.round(+pk/md))<1e-6&&!gm)gm=Math.round(md*1e4)/1e4}
+  /* 測点の食い違い: 測点名(NO.x+y)と通し距離のずれが途中で変わる所を読み取る */
+  const eq=[];{let pd=null,lp=null,fk=null;c.pts.forEach(b=>{const m=SRE.exec(b.nm||"");if(m&&b.st!=null){const pp=pk?+pk:c.pitch;if(!pp)return;const lab=+m[1]*pp+num(m[2]);const d=lab-b.st;
+    if(pd==null){if(Math.abs(d)>0.0005)eq.push({a:b.st-0.01,o:d})}
+    else if(Math.abs(d-pd)>0.0005){const a=fk!=null?fk:(lp!=null?lp:b.st);eq.push({a,o:d-pd})}
+    pd=d;lp=b.st;fk=null}else if(pd!=null&&b.st!=null&&fk==null)fk=b.st});
+   if(eq.length)warn.push(`「${c.name}」: 測点名と通し距離がずれる所が${eq.length}か所あったので、「測点の食い違い」に設定しました(${eq.map(e=>f(e.a,3)+"m で "+(e.o>=0?"+":"")+f(e.o,3)+"m").join("、")})`)}
+  c.eq=eq;
   const kp=[];c.pts.forEach((b,i)=>{if(i===0||i===c.pts.length-1||!SRE.test(b.nm||""))kp.push(i)});
-  if(kp.length>=2&&kp.length<c.pts.length){const np=[];for(let q=0;q+1<kp.length;q++){const i=kp[q],j=kp[q+1],m=merge(c.pts.slice(i,j).map(b=>b.c));
-    if(j===i+1||m!==undefined){np.push({...c.pts[i],c:j===i+1?c.pts[i].c:m});if(j>i+1)mg+=j-i-1}else{for(let k=i;k<j;k++)np.push(c.pts[k])}}
+  if(kp.length>=2&&kp.length<c.pts.length){const np=[];for(let q=0;q+1<kp.length;q++){const i=kp[q],j=kp[q+1],sl=c.pts.slice(i,j),m=j===i+1?sl[0].c:merge(sl.map(b=>b.c)),ps=c.pts.slice(i,j+1).map(b=>P[b.id]);
+    if(j===i+1||(m!==undefined&&ps.every(Boolean)&&onEl(ps,m))){np.push({...c.pts[i],c:m});if(j>i+1)mg+=j-i-1}else{for(let k=i;k<j;k++)np.push(c.pts[k])}}
    np.push(c.pts[c.pts.length-1]);c.pts=np}
-
   c.pts.forEach((b,i)=>{const q=P[b.id];if(!q){skip++;return}
    if(!rows.length){rows.push({p:"",n:q.n||"BP",x:f(q.x,4),y:f(q.y,4),t:"BP点",d:"R",r1:"",r2:"",a:""});return}
-   const e=c.pts[i-1].c,row={p:"",n:q.n,x:f(q.x,4),y:f(q.y,4),t:"直線",d:"R",r1:"",r2:"",a:""},num=v=>{const n=parseFloat(v);return isNaN(n)?0:n},dr=v=>((v<0)!==!!o.flip)?"R":"L";
+   const e=c.pts[i-1].c,row={p:"",n:q.n,x:f(q.x,4),y:f(q.y,4),t:"直線",d:"R",r1:"",r2:"",a:""},dr=v=>((v<0)!==!!o.flip)?"R":"L";
    if(e&&e[0]==="C01"){const R=num(e[2]);if(R)row.t="単曲線",row.r1=f(Math.abs(R),4),row.d=dr(R);else skip++}
    else if(e&&e[0]==="C02"){const A=num(e[1]),a=num(e[2]),b2=num(e[3]);
     if(!(A>0))skip++;
@@ -1130,17 +1152,21 @@ function simaRoutes(text,o){o=o||{};const L=text.split(/\r?\n/),sp=l=>l.split(",
    else{const pr=rows[rows.length-1];if(Math.hypot(+pr.x-q.x,+pr.y-q.y)<1e-3){dup++;return}}   /* 長さ0の直線(同じ位置の点が2つ続く)は1つにまとめる */
    rows.push(row)});
   if(rows.length<2){warn.push(`「${c.name}」: 点が足りません`);return}
-  const pr_=res[res.length-1];if(pr_&&pr_.rows.length===rows.length&&pr_.rows.every((r,i)=>r.t===rows[i].t&&r.x===rows[i].x&&r.y===rows[i].y&&r.r1===rows[i].r1&&r.r2===rows[i].r2&&r.a===rows[i].a)){warn.push(`「${c.name}」は「${pr_.name}」と同じ形なので、1本にまとめました`);return}
-  if(mg)warn.push(`「${c.name}」: 測点ごとに刻まれた点${mg}個を外して、要素点だけにまとめました`);if(dup)warn.push(`「${c.name}」: 同じ位置の点が続く所${dup}か所を1点にまとめました`);res.push({name:c.name,rows,sta:+c.sta.toFixed(4),vp:[],vps:[],pitch:c.pitch,skip,gap:0,method:null,jx:false})};
+  const same_=res.find(r=>r.rows.length===rows.length&&r.rows.every((r2,i)=>r2.t===rows[i].t&&r2.x===rows[i].x&&r2.y===rows[i].y&&r2.r1===rows[i].r1&&r2.r2===rows[i].r2&&r2.a===rows[i].a));
+  if(same_){if(c.eq.length&&!(same_.eq||[]).length)same_.eq=c.eq;warn.push(`「${c.name}」は「${same_.name}」と同じ形なので、1本にまとめました`);return}
+  if(mg)warn.push(`「${c.name}」: 測点ごとに刻まれた点${mg}個を外して、要素点だけにまとめました`);if(dup)warn.push(`「${c.name}」: 同じ位置の点が続く所${dup}か所を1点にまとめました`);
+  res.push({name:c.name,rows,sta:+c.sta.toFixed(4),eq:c.eq,vp:[],vps:[],pitch:c.pitch,skip,gap:0,method:null,jx:false})};
  L.forEach(l=>{const k=l.slice(0,3);
-  if(k==="F00"){done();const t=sp(l);cur={name:t[3]||`路線${res.length+1}`,sta:0,pitch:null,pts:[]}}
+  if(k==="F00"){done();const t=sp(l);cur={name:t[3]||`路線${res.length+1}`,sta:null,pitch:null,pts:[]}}
   else if(!cur)return;
-  else if(k==="F03"){const t=sp(l);cur.sta=parseFloat(t[1])||0;const p=parseFloat(t[2]);cur.pitch=p>0?p:null}
+  else if(k==="F03"){const t=sp(l),v=parseFloat(t[1]);cur.sta=isNaN(v)?null:v;const p=parseFloat(t[2]);cur.pitch=p>0?p:null}
   else if(k==="B01"){const t=sp(l);cur.pts.push({id:t[1],nm:t[2]||"",c:null,st:null})}
   else if(k==="B03"){const b=cur.pts[cur.pts.length-1];if(b){const v=parseFloat(sp(l)[1]);if(!isNaN(v))b.st=v}}
   else if(k==="C01"||k==="C02"){const b=cur.pts[cur.pts.length-1];if(b)b.c=sp(l)}
   else if(k==="F99")done()});
- done();res.forEach(r=>{if(!r.pitch&&gp)r.pitch=gp;if(gm)r.mid=gm});if(gp)warn.push(`測点名(NO.255+65 など)と通し距離から、ステーションピッチ${gp}m${gm?`・中間ピッチ${gm}m`:''}を読み取って設定しました`);
+ done();res.forEach(r=>{if(!r.pitch&&gp)r.pitch=gp;if(gm)r.mid=gm});
+ if(gp)warn.push(`測点名(NO.255+65 など)と通し距離から、ステーションピッチ${gp}m${gm?`・中間ピッチ${gm}m`:''}を読み取って設定しました`);
+ {const cnt={};res.forEach(r=>cnt[r.name]=(cnt[r.name]||0)+1);res.forEach(r=>{if(cnt[r.name]>1)r.name=`${r.name}(${r.rows[0].n})`})}
  if(!res.length)throw new Error("SIMAの路線データ(F00・B01・C01/C02)が見つかりません。座標だけのSIMは、座標管理の「取り込む」から読み込んでください");
  return{routes:res,warn,jx:false,fmt:"SIMA 路線データ"}}
 function xmlRoutes(text,o){o=o||{};if(!/^\s*</.test(text))return simaRoutes(text,o);const doc=new DOMParser().parseFromString(text,"application/xml");
@@ -1198,7 +1224,7 @@ function roadGmRoutes(doc,o){const kids=(e,ln)=>[...e.children].filter(c=>c.loca
  return{routes:res,warn,jx:false,fmt:"道路GM XML"}}
 function xmlImport(text,o){const R_=xmlRoutes(text,o),ids=[],msg=[];backup();   /* 開いていた線形を置き換えるので、「元に戻す」で戻せるようにする */
  R_.routes.forEach(r=>{let nm=r.name,k=2;while(S.routes.some(x=>x.name===nm))nm=`${r.name}(${k++})`;const id=uid();ids.push(id);
-  S.routes.push({id,mp:[],mpaz:"",vp:r.vp,vps:r.vps||[],vpi:0,mode:"1",ep:r.rows,ip:"",ipa:"A",pi:String(r.pitch||20),pmid:String(r.mid||""),sa:String(r.sta),of:"",chk:null,name:nm});
+  S.routes.push({id,mp:[],mpaz:"",vp:r.vp,vps:r.vps||[],vpi:0,mode:"1",ep:r.rows,ip:"",ipa:"A",pi:String(r.pitch||20),pmid:String(r.mid||""),peq:(r.eq||[]).map(e=>f(e.a,4)+":"+f(e.o,4)).join(", "),sa:String(r.sta),of:"",chk:null,name:nm});
   msg.push(`・${nm}: ${r.rows.length}点${r.vp.length?` / 縦断${r.vp.length}点`:""}${(r.vps||[]).length>1?`(縦断${r.vps.length}種類を切り替えられます)`:""}${r.skip?` / 読めない要素${r.skip}個`:""}${r.gap?` / ⚠要素のつながりに隙間${r.gap}か所`:""}`)});
  let np=0,ex=0;
  if(!o||o.reg!==false){let mx=0;S.pts.forEach(p=>{if(/^\d+$/.test(String(p.n)))mx=Math.max(mx,+p.n)});
@@ -1206,6 +1232,8 @@ function xmlImport(text,o){const R_=xmlRoutes(text,o),ids=[],msg=[];backup();   
    let p=S.pts.find(q=>Math.abs(q.x-x)<2e-3&&Math.abs(q.y-y)<2e-3);if(p)ex++;else{p={id:uid(),n:String(++mx),m:`${rt.name} ${e.n||(i?"点"+(i+1):"BP")}`,x,y,z:0};S.pts.push(p);np++}
    e.p=p.n})})}
  if(np||ex)msg.push(`・変化点を座標登録: 新規${np}点${ex?` / すでに同じ座標の点${ex}点は、その点に結び付けました`:""}`);
+ ids.forEach(id=>{const rt=S.routes.find(x=>x.id===id);if(!rt||rt.mode!=="1")return;LASTINFO=[];loadRt(rt);const g=(LASTINFO||[]).filter(t=>/⚠終点との差/.test(t));
+  if(g.length)msg.push(`⚠ ${rt.name}: 要素どうしがつながらない所が${g.length}か所あります(${g.slice(0,3).map(t=>t.replace(/ L=[\d.]+/,"")).join(" / ")}${g.length>3?" …":""})。元データの座標と、A値・半径が合っていない可能性があります`)});
  sv();all();rEl();rRt(ids[0]);loadRt(S.routes.find(x=>x.id===ids[0]));
  return{n:ids.length,jx:R_.jx,fmt:R_.fmt||(R_.jx?"国総研XML":"LandXML"),msg:[...msg,...R_.warn],first:ids[0]}}
 async function xmlDecode(file){const b=new Uint8Array(await file.arrayBuffer());let enc="utf-8";
@@ -1365,7 +1393,7 @@ $("tsp").onclick=()=>stepS(-1);$("tsx").onclick=()=>stepS(1);
    要素ごとの見出し + NO/ステーション/区間距離/追加距離/X/Y/接線方向角/弦長/弦方向角 */
 const dmsH=a=>{const t=Math.round(mod(a)*3600)%1296000,p=n=>String(n).padStart(2,"0");return`${Math.floor(t/3600)}-${p(Math.floor(t%3600/60))}-${p(t%60)}`};
 function centerModel(){if(!LA||!route.length)return null;const pit=LA.pitch,zf=zFn(),st0=Math.round(num($("exn").value)||1),isK=x=>LA.key.find(k=>Math.abs(k[0]-x)<1e-6);let no=st0,prevEnd=null;
- const elems=LA.sg.map(g=>{const e=segInfo(g,LA.evf),xs=[g.s0];for(let k=Math.floor((g.s0+1e-6)/pit)+1;k*pit<g.s1-1e-6;k++)xs.push(k*pit);{const mid=num($("pmid").value)||0;if(mid>0&&Math.abs(mid-pit)>1e-9)for(let k=Math.floor((g.s0+1e-6)/mid)+1;k*mid<g.s1-1e-6;k++)if(!xs.some(v=>Math.abs(v-k*mid)<1e-6))xs.push(k*mid)}LA.key.forEach(([kx])=>{if(kx>g.s0+1e-6&&kx<g.s1-1e-6&&!xs.some(v=>Math.abs(v-kx)<1e-6))xs.push(kx)});xs.push(g.s1);xs.sort((a,b)=>a-b);
+ const elems=LA.sg.map(g=>{const e=segInfo(g,LA.evf),xs=[g.s0];stPts(g.s0,g.s1,pit).forEach(x=>{if(x>g.s0+1e-6&&x<g.s1-1e-6)xs.push(x)});{const mid=num($("pmid").value)||0;if(mid>0&&Math.abs(mid-pit)>1e-9)stPts(g.s0,g.s1,mid).forEach(x=>{if(x>g.s0+1e-6&&x<g.s1-1e-6&&!xs.some(v=>Math.abs(v-x)<1e-6))xs.push(x)})}LA.key.forEach(([kx])=>{if(kx>g.s0+1e-6&&kx<g.s1-1e-6&&!xs.some(v=>Math.abs(v-kx)<1e-6))xs.push(kx)});xs.push(g.s1);xs.sort((a,b)=>a-b);
   const pts=xs.map(x=>{const p=LA.at(x),kk=isK(x);return{x,X:p.x,Y:p.y,a:p.a,z:zf?zf(x):null,nm:kk?kk[1]:stn(x,pit)}});
   const rows=pts.map((q,j)=>{const nx=pts[j+1],pv=pts[j-1];
    return{no:(j==0&&prevEnd!==null)?prevEnd:no++,st:stnSheet(q.x,pit),sec:pv?q.x-pv.x:null,add:q.x,X:q.X,Y:q.Y,tan:q.a,cl:nx?dist({x:q.X,y:q.Y},{x:nx.X,y:nx.Y}):null,ca:nx?azim({x:q.X,y:q.Y},{x:nx.X,y:nx.Y}):null,z:q.z,nm:q.nm}});
@@ -2338,7 +2366,7 @@ function coRun(){const id=$("cos").value,r=id&&S.routes.find(x=>x.id===id);if(!r
 function coRun0(){const id=$("cos").value;if(id){const r=S.routes.find(x=>x.id===id);if(r){loadRt(r);$("rtsel").value=id}}
  if(!LA){$("coe").textContent="先に「線形作成」で線形を計算するか、保存した線形を選んでください";$("corc").innerHTML="";ctShow();return}
  if(ofSignBad($("coo").value)){$("coe").textContent=OF_MSG;$("corc").innerHTML="";ctShow();return}const offs=[...$("coo").value.normalize("NFKC").matchAll(/([LR])\s*(\d+(?:\.\d+)?)/gi)].map(m=>[m[1].toUpperCase(),+m[2]]);if(!offs.length){$("coe").textContent="オフセットを入れてください(例: L3.0 R3.0)";$("corc").innerHTML="";ctShow();return}
- $("coe").textContent="";const pit=num($("cop").value)||LA.pitch,st=new Map();for(let k=Math.ceil(LA.s0/pit-1e-9);k*pit<=LA.send+1e-7;k++)st.set(Math.round(k*pit*1e5),null);(LA.key||[]).forEach(([x,nm])=>st.set(Math.round(x*1e5),nm));st.set(Math.round(LA.s0*1e5),st.get(Math.round(LA.s0*1e5))||null);st.set(Math.round(LA.send*1e5),st.get(Math.round(LA.send*1e5))||null);
+ $("coe").textContent="";const pit=num($("cop").value)||LA.pitch,st=new Map();stPts(LA.s0,LA.send,pit).forEach(x=>st.set(Math.round(x*1e5),null));(LA.key||[]).forEach(([x,nm])=>st.set(Math.round(x*1e5),nm));st.set(Math.round(LA.s0*1e5),st.get(Math.round(LA.s0*1e5))||null);st.set(Math.round(LA.send*1e5),st.get(Math.round(LA.send*1e5))||null);
  const zf=zFn(),rows=[];[...st.keys()].sort((a,b)=>a-b).forEach(k=>{const x=k/1e5,p=LA.at(x),nm=st.get(k)||stn(x,LA.pitch),z=zf&&zf(x)!=null?zf(x):0;offs.forEach(([sd,w])=>{const sn=sd=="R"?1:-1;rows.push({n:"",m:`${nm}-${sd}${f(w,1)}`,x:p.x-sn*w*Math.sin(p.a*R),y:p.y+sn*w*Math.cos(p.a*R),z,s:x,side:sd,w})})});
  COP={rows,name:rtName()};ctMap(["L","R"].flatMap(sd=>{const g=rows.filter(r=>r.side==sd);const byW={};g.forEach(r=>{(byW[r.w]=byW[r.w]||[]).push(r)});return Object.values(byW).flatMap(a=>a.slice(1).map((r,i)=>dL(a[i],r)))}));
  $("corc").innerHTML=`<h2>${esc(COP.name)} のオフセット ${rows.length}点</h2>${K("オフセット",offs.map(([a,b])=>a+f(b,1)).join(" ・ "))}${K("間隔",f(pit,2)+" m(主要点も含む)")}<div class="sc"><table><tr><th>点名</th><th>X</th><th>Y</th><th>Z</th></tr>${rows.slice(0,14).map(r=>`<tr><td>${esc(r.m)}</td><td>${f(r.x)}</td><td>${f(r.y)}</td><td>${f(r.z)}</td></tr>`).join("")}</table></div>${rows.length>14?`<div class="m">ほか ${rows.length-14}点</div>`:""}
@@ -2354,7 +2382,7 @@ function ctInit(){$("cta").innerHTML=CTT.map((t,i)=>`<option value="${i}">${t.n}
   else if(t.dataset.lm){const p=t.dataset.lm;$(p+"_w2").style.display=t.value=="2"?"":"none";$(p+"_wa").style.display=t.value=="a"?"":"none"}
   else if(t.id=="mv_m"){$("mv_d").style.display=t.value=="d"?"":"none";$("mv_a").style.display=t.value=="a"?"":"none"}});
  ["ta","tb","tc","td","so","sb","st"].forEach(qpInit);const _all0=all;all=function(){_all0();ctUi();qpSync();rTrs()};ctForm();cbForm();ctUi();
- ["pi","pmid","of"].forEach(i=>{const e=$(i);if(e&&e.addEventListener)e.addEventListener("input",auto)})   // ピッチ・幅杭を直したら、計算ボタンなしで再計算する
+ ["pi","pmid","peq","of"].forEach(i=>{const e=$(i);if(e&&e.addEventListener)e.addEventListener("input",auto)})   // ピッチ・幅杭を直したら、計算ボタンなしで再計算する
 }
 const _ic=(d)=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`,
  ICONS={help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/>',cad:'<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/><circle cx="12" cy="12" r=".6"/>',pin:'<path d="M12 21s-6.5-5.4-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/>',inst:'<circle cx="12" cy="6.5" r="2.7"/><path d="M12 9.2L7 20M12 9.2l5 10.8M12 9.2V20M9 15h6"/>',target:'<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.4"/><path d="M12 2v3.5M12 18.5V22M2 12h3.5M18.5 12H22"/>',curve:'<path d="M4 20c0-9 4-9.5 8-9.5s8-.5 8-6.5"/><circle cx="4" cy="20" r="1.6"/><circle cx="20" cy="4" r="1.6"/>',poly:'<path d="M5 7l8-3 6 6-3 9-10-2z"/><circle cx="5" cy="7" r="1.3"/><circle cx="13" cy="4" r="1.3"/><circle cx="19" cy="10" r="1.3"/><circle cx="16" cy="19" r="1.3"/><circle cx="6" cy="17" r="1.3"/>',folder:'<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.2h7.5A2.5 2.5 0 0 1 21 9.7v7.8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>',map:'<path d="M9 4.5L3.5 6.5v13L9 17.5l6 2 5.5-2v-13L15 6.5z"/><path d="M9 4.5v13M15 6.5v13"/>',menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',calc:'<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 15.5h.01M12 15.5h.01M15.5 15.5h.01M8.5 18.5h.01M12 18.5h.01M15.5 18.5h.01"/>'};

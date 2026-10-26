@@ -836,7 +836,7 @@ $("if1").onchange=async()=>{const f0=$("if1").files[0];if(!f0)return;imsg("読�
 
 /* ===== 線形の保存 / 現場データ(.sks.json) ===== */
 const curRt=()=>({vps:vpsSync(),vpi:S.vpi||0,mp:JSON.parse(JSON.stringify(S.mp)),mpaz:S.mpaz||$("mpaz").value||"",vp:JSON.parse(JSON.stringify(S.vp)),mode:$("rmode").value,ep:JSON.parse(JSON.stringify(S.ep)),ip:$("ip").value,ipa:$("ipa").value,pi:$("pi").value,pmid:$("pmid").value,peq:($("peq")||{}).value||"",sa:$("sa").value,of:$("of").value,chk:CHK});
-function rRt(sel){setTimeout(hdUpd,0);$("rtsel").innerHTML=S.routes.length?S.routes.map(r=>`<option value="${r.id}">${esc(r.name)}(${r.mode=="2"?"要素法簡易バージョン "+(r.mp||[]).length+"行":r.mode=="1"?"要素法詳細バージョン "+(r.ep||[]).length+"点":"IP法"})</option>`).join(""):`<option value="">保存した線形はありません</option>`;if(sel)$("rtsel").value=sel;rVsl(sel);rExSel()}
+function rRt(sel){setTimeout(hdUpd,0);if(CADON)setTimeout(othUpdate,50);$("rtsel").innerHTML=S.routes.length?S.routes.map(r=>`<option value="${r.id}">${esc(r.name)}(${r.mode=="2"?"要素法簡易バージョン "+(r.mp||[]).length+"行":r.mode=="1"?"要素法詳細バージョン "+(r.ep||[]).length+"点":"IP法"})</option>`).join(""):`<option value="">保存した線形はありません</option>`;if(sel)$("rtsel").value=sel;rVsl(sel);rExSel()}
 function loadRt(r){S.vps=JSON.parse(JSON.stringify(r.vps||[]));S.vpi=r.vpi||0;S.mp=JSON.parse(JSON.stringify(r.mp||[]));S.mpaz=r.mpaz||"";if($("mpaz"))$("mpaz").value=S.mpaz;mpAzHint();rMp();S.vp=JSON.parse(JSON.stringify(r.vp||[]));rVp();S.ep=JSON.parse(JSON.stringify(r.ep||[]));$("ip").value=r.ip||"";$("ipa").value=r.ipa||"A";$("pi").value=r.pi||"20";$("pmid").value=r.pmid||"";if($("peq"))$("peq").value=r.peq||"";$("sa").value=r.sa||"0";$("of").value=r.of||"";CHK=r.chk||null;
  $("rmode").value=r.mode||"0";$("rmode").onchange();$("rtn").value=r.name||"";sv();hdUpd();rEl();
  if(r.mode=="1"){if(S.ep.length>1)elemCalc()}else if(r.mode=="2"){if(S.mp.length>1)mpCalc()}else if((r.ip||"").trim())ipCalc()}
@@ -893,11 +893,21 @@ const cv=$("cv"),cc=cv.getContext("2d"),V={x:0,y:0,s:1,init:false},ptr=new Map()
 const niceN=v=>{const p=Math.pow(10,Math.floor(Math.log10(v))),k=[1,2,5,10].find(k=>k*p>=v);return k*p};
 const toS=(wx,wy)=>[W/2+(wx-V.x)*V.s,H/2-(wy-V.y)*V.s],toW=(sx,sy)=>[V.x+(sx-W/2)/V.s,V.y-(sy-H/2)/V.s];
 function cadSize(){const r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1;W=r.width||300;H=r.height||200;cv.width=W*d;cv.height=H*d;cc.setTransform(d,0,0,d,0,0)}
-function cadFit(){cadSize();const su0=typeof getSetup=="function"?getSetup():null,tg0=typeof getTarget=="function"?getTarget():null,a=[...S.pts.map(p=>[p.y,p.x]),...(route||[]).map(r=>[r.y,r.x]),...(CADT?CADT.pts.map(p=>[p.y,p.x]):[]),...pltRows().map(p=>[p.y,p.x]),...(su0?[[su0.o.y,su0.o.x]]:[]),...(tg0?[[tg0.y,tg0.x]]:[])];if(!a.length){V.x=0;V.y=0;V.s=1;return}
+function cadFit(){cadSize();const su0=typeof getSetup=="function"?getSetup():null,tg0=typeof getTarget=="function"?getTarget():null,a=[...S.pts.map(p=>[p.y,p.x]),...(route||[]).map(r=>[r.y,r.x]),...(S.cadln!==false?[...OTH.values()].flatMap(o=>o.pts.map(p=>[p.y,p.x])):[]),...(CADT?CADT.pts.map(p=>[p.y,p.x]):[]),...pltRows().map(p=>[p.y,p.x]),...(su0?[[su0.o.y,su0.o.x]]:[]),...(tg0?[[tg0.y,tg0.x]]:[])];if(!a.length){V.x=0;V.y=0;V.s=1;return}
  const xs=a.map(q=>q[0]),ys=a.map(q=>q[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
  V.x=(x0+x1)/2;V.y=(y0+y1)/2;V.s=Math.min((W-50)/Math.max(x1-x0,1),(H-50)/Math.max(y1-y0,1));cadDraw()}
 function cadFitSetup(){cadSize();const su=getSetup(),tg=getTarget(),a=[];if(su){a.push([su.o.y,su.o.x]);if(su.b)a.push([su.b.y,su.b.x])}if(tg)a.push([tg.y,tg.x]);if(!a.length){cadFit();return}
  const xs=a.map(q=>q[0]),ys=a.map(q=>q[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);V.y=(y0+y1)/2;V.s=Math.min(5000,Math.min((W-150)/Math.max(x1-x0,6),(H-80)/Math.max(y1-y0,6)));V.x=(x0+x1)/2+42/V.s;cadDraw()}
+/* 選んでいない保存済みの線形も、マップにグレーで出す。一時的にその線形を読み込んで形だけ取り出し(結果は保存して使い回す)、終わったら元に戻す */
+let OTH=new Map(),OTHBUSY=false;
+const othKey=r=>JSON.stringify([r.mode,r.ep,r.mp,r.ip,r.ipa,r.sa,r.pi,r.pmid,r.peq,r.of]);
+function othUpdate(){if(OTHBUSY)return;const todo=S.routes.filter(r=>{const o=OTH.get(r.id);return!o||o.k!==othKey(r)});
+ [...OTH.keys()].forEach(id=>{if(!S.routes.some(r=>r.id===id))OTH.delete(id)});if(!todo.length)return;
+ OTHBUSY=true;const snap={...curRt(),name:$("rtn").value},sel=$("rtsel").value;
+ try{todo.forEach(r=>{let pts=[];try{loadRt(r);if(LA&&CADR&&CADR.length>1)pts=CADR.map(p=>({x:p.x,y:p.y}))}catch(e){}OTH.set(r.id,{k:othKey(r),pts})})}
+ finally{LA=null;route=[];CADR=null;["ro","qt"].forEach(i=>{const e=$(i);if(e)e.style.display="none"});try{loadRt(snap)}catch(e){}$("rtsel").value=sel;OTHBUSY=false;if(typeof exInfo==="function")exInfo();hdUpd()}
+ if(CADON)cadDraw()}
+const othCur=()=>{const c=S.routes.find(x=>x.name===($("rtn").value||"").trim());return c?c.id:null};
 function cadDraw(){if(!CADON)return;cadSize();const c=cc,cs=getComputedStyle(document.documentElement),col=n=>cs.getPropertyValue(n).trim()||"#888";
  c.fillStyle=col("--cd");c.fillRect(0,0,W,H);c.font="10px sans-serif";
  const m=niceN(60/V.s),w0=toW(0,H)[0],w1=toW(W,0)[0],h0=toW(0,H)[1],h1=toW(W,0)[1];
@@ -905,6 +915,8 @@ function cadDraw(){if(!CADON)return;cadSize();const c=cc,cs=getComputedStyle(doc
  for(let v=Math.ceil(w0/m)*m;v<=w1;v+=m){const sx=toS(v,0)[0];c.moveTo(sx,0);c.lineTo(sx,H)}
  for(let v=Math.ceil(h0/m)*m;v<=h1;v+=m){const sy=toS(0,v)[1];c.moveTo(0,sy);c.lineTo(W,sy)}c.stroke();
  c.fillStyle=col("--sb");for(let v=Math.ceil(w0/m)*m;v<=w1;v+=m)c.fillText("Y"+Math.round(v),toS(v,0)[0]+2,10);for(let v=Math.ceil(h0/m)*m;v<=h1;v+=m)c.fillText("X"+Math.round(v),2,toS(0,v)[1]-2);
+ if(S.cadln!==false&&!OTHBUSY){const cur=othCur();c.save();c.strokeStyle=col("--sb");c.globalAlpha=.55;c.lineWidth=1.8;c.fillStyle=col("--sb");c.font="10px sans-serif";
+  S.routes.forEach(r=>{if(r.id===cur)return;const o=OTH.get(r.id);if(!o||o.pts.length<2)return;c.beginPath();o.pts.forEach((p,i)=>{const q=toS(p.y,p.x);i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1])});c.stroke();const mp=o.pts[o.pts.length>>1],q=toS(mp.y,mp.x);c.globalAlpha=.9;c.fillText(r.name,q[0]+4,q[1]-4);c.globalAlpha=.55});c.restore()}
  if(S.cadln!==false&&CADR&&CADR.length>1){c.strokeStyle=col("--ac");c.lineWidth=2.5;c.beginPath();CADR.forEach((p,i)=>{const q=toS(p.y,p.x);i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1])});c.stroke()}
  if($("t5").classList.contains("on")){const og="#f59e0b",lnOn=S.cadln!==false;
   {const A=gp("ta"),B=gp("tb"),md=$("tm").value,C=md=="tie"?gp("tc"):null,D=md=="tie"?gp("td"):null;
@@ -959,7 +971,7 @@ $("cpos").onclick=()=>{const m=$("cmenu");m.style.display=m.style.display=="bloc
 $("cmenu").onclick=e=>{const p=e.target.dataset&&e.target.dataset.p;if(!p)return;S.cadpos=p;sv();$("cmenu").style.display="none";cadLayout();setTimeout(cadFit,30)};
 function cadLnUi(){$("cln").textContent=S.cadln===false?"線:非表示":"線:表示"}
 $("cln").onclick=()=>{S.cadln=S.cadln===false;sv();cadLnUi();cadDraw()};
-function cadToggle(on){CADON=on===undefined?!CADON:on;$("cad").style.display=CADON?"block":"none";document.body.classList.toggle("cadon",CADON);cadLayout();$("cadbtn").classList.toggle("on",CADON);
+function cadToggle(on){CADON=on===undefined?!CADON:on;if(CADON)setTimeout(othUpdate,0);$("cad").style.display=CADON?"block":"none";document.body.classList.toggle("cadon",CADON);cadLayout();$("cadbtn").classList.toggle("on",CADON);
  if(CADON)setTimeout(()=>{if(!V.init||($("t1").classList.contains("on")&&getSetup()&&getTarget())){V.init=true;($("t1").classList.contains("on")&&getSetup()&&getTarget())?cadFitSetup():cadFit()}else cadDraw()},0)}
 $("cadbtn").onclick=()=>cadToggle();$("cx").onclick=()=>cadToggle(false);$("cfit").onclick=cadFit;function cadFitCalc(){cadSize();const a=[];(CADC||[]).forEach(it=>{if(it.t=="pt")a.push([it.y,it.x]);else if(it.t=="line"||it.t=="arrow"){a.push([it.a.y,it.a.x],[it.b.y,it.b.x])}else if(it.t=="circle"){a.push([it.c.y-it.r,it.c.x-it.r],[it.c.y+it.r,it.c.x+it.r])}});if(!a.length){cadFit();return}
  const xs=a.map(q=>q[0]),ys=a.map(q=>q[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);V.y=(y0+y1)/2;V.s=Math.min(5000,Math.min((W-230)/Math.max(x1-x0,6),(H-110)/Math.max(y1-y0,6)));V.x=(x0+x1)/2+75/V.s;cadDraw()}

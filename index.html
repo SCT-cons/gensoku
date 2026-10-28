@@ -448,7 +448,7 @@ input.qpi{margin-bottom:6px}
 <label>線形</label><select id="cos"></select><label>オフセット(L=左 R=右)</label><input id="coo" value="L3.0 R3.0" placeholder="例: L3.0 R3.0 L5.0"><label>間隔(m・空欄=線形のピッチ)</label><input class="n" id="cop" placeholder="例: 10">
 <button class="p" id="cogo" style="width:100%;margin-top:12px">計算</button><div class="e" id="coe"></div></div>
 <div class="c" data-ct="c" data-r="1" id="corc" style="display:none"></div>
-<div class="c" data-ct="e"><h2>逆幅杭計算</h2><div class="m" style="margin-bottom:6px">点の座標から、いま開いている線形の「測点」と「オフセット(左右の距離)」を求めます。線形は画面右上の「線形」で切り替えられます。</div><div class="m" id="ivl" style="margin-bottom:6px"></div>
+<div class="c" data-ct="e"><h2>逆幅杭計算</h2><div class="m" style="margin-bottom:6px">点の座標から、いま開いている線形の「測点」と「オフセット(左右の距離)」を求めます。線形は画面右上の「線形」で切り替えられます。</div><label>使う線形</label><select id="ivls"></select><div class="m" id="ivl" style="margin:4px 0 6px"></div>
 <label>対象の点</label><select id="ivt"><option value="ck">座標管理でチェックした点</option><option value="mp">地図で選んだ点(タップ・囲む)</option><option value="all">全ての点</option><option value="rng">点番の範囲で指定</option></select><div class="r" id="ivrw" style="display:none;margin-top:6px"><div class="cf"><small>点番(から)</small><input class="n" id="ivr1" inputmode="numeric" placeholder="例: 101"></div><div class="cf"><small>点番(まで)</small><input class="n" id="ivr2" inputmode="numeric" placeholder="例: 120"></div></div><div class="m" id="ivn" style="margin-top:4px"></div>
 <button class="p" id="ivgo" style="width:100%;margin-top:12px">計算</button><div class="e" id="ive"></div></div>
 <div class="c" data-ct="e" data-r="1" id="ivrc" style="display:none"></div>
@@ -1152,9 +1152,9 @@ function makeZip(files){const enc=new TextEncoder(),parts=[],cd=[];let off=0;con
 const xe=x=>String(x).replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c])),ascii=x=>String(x).replace(/[^\x20-\x7e]/g,"_").replace(/,/g,"_");
 /* ヘッダーの「ジョブ名」と「使っている線形」。線形はここで切り替えられる(測設・計算・書き出しがその線形になる) */
 function hdUpd(){const e=$("hrts");if(!e)return;const cur=S.routes.find(x=>x.name===($("rtn").value||"").trim());
- e.innerHTML=(cur?"":`<option value="" selected>${($("rtn").value||"").trim()?esc($("rtn").value.trim())+"(未保存)":"未選択"}</option>`)+S.routes.map(r=>`<option value="${r.id}"${cur&&cur.id===r.id?" selected":""}>${esc(r.name)}</option>`).join("");$("hrtw").style.display=S.routes.length||cur?"":"none";if($("tls")){$("tls").innerHTML=e.innerHTML;$("tls").value=e.value}}
+ e.innerHTML=(cur?"":`<option value="" selected>${($("rtn").value||"").trim()?esc($("rtn").value.trim())+"(未保存)":"未選択"}</option>`)+S.routes.map(r=>`<option value="${r.id}"${cur&&cur.id===r.id?" selected":""}>${esc(r.name)}</option>`).join("");$("hrtw").style.display=S.routes.length||cur?"":"none";if($("tls")){$("tls").innerHTML=e.innerHTML;$("tls").value=e.value}if($("ivls")){$("ivls").innerHTML=e.innerHTML;$("ivls").value=e.value}}
 $("rtn").addEventListener("input",()=>hdUpd());
-const swRt=id=>{const r=S.routes.find(x=>x.id===id);if(!r){hdUpd();return}backup();loadRt(r);$("rtsel").value=r.id;rSt();if(CADON)cadDraw();toast(`線形を「${r.name}」に切り替えました`)};
+const swRt=id=>{const r=S.routes.find(x=>x.id===id);if(!r){hdUpd();return}backup();loadRt(r);$("rtsel").value=r.id;rSt();if(CADON)cadDraw();if(IV){ivUi();ivRun()}toast(`線形を「${r.name}」に切り替えました`)};
 /* ピッチ欄: 入っている値で候補が絞られないよう、触ったときは一旦空にして全候補を出す(何も選ばなければ元に戻す) */
 {const e=$("pi");e.addEventListener("focus",()=>{e.dataset.v=e.value;e.value=""});e.addEventListener("blur",()=>{if(e.value==="")e.value=e.dataset.v||e.value})}
 /* ヘッダーの 新規・開く・保存・戻す と、ロゴを押すと出るファイルメニュー(ジョブ画面と同じ動き) */
@@ -1186,7 +1186,7 @@ function hUndoUi(){const b=$("hundo");if(b)b.disabled=!BAK;const u=$("happ")&&$(
   else{const id={open:"happo",imp:"happi",exp:"happx"}[k],el=$(id),on=el.style.display==="none";["happo","happi","happx"].forEach(i=>$(i).style.display="none");el.style.display=on?"":"none"}};
  document.addEventListener("click",e=>{if(!e.target.closest("#hopm,#hopen,#happ,#hlogob"))hide()});
  setInterval(hUndoUi,700)}
-$("hrts").onchange=()=>swRt($("hrts").value);$("tls").onchange=()=>swRt($("tls").value);
+$("hrts").onchange=()=>swRt($("hrts").value);$("tls").onchange=()=>swRt($("tls").value);$("ivls").onchange=()=>swRt($("ivls").value);
 const rtName=()=>($("rtn").value||"線形").trim().replace(/[\\\/:*?"<>|]/g,"_");
 function segInfo(g,evf){let k="line",r1=Infinity,r2=Infinity;const sn=g.sg||1;
  if(g.t){if(g.t=="c"){k="arc";r1=r2=g.r}else if(g.t=="p1"){k="sp";r2=g.r}else if(g.t=="p2"){k="sp";r1=g.r}}
@@ -2441,7 +2441,7 @@ function invPt(P){const c=ivPre();if(!c)return null;let bi=0,bd=1e300;for(let i=
 const ivTargets=()=>{const v=$("ivt").value;if(v=="mp")return S.pts.filter(p=>MSEL.has(p.id));if(v=="all")return S.pts;if(v=="rng"){const a=num($("ivr1").value),b=num($("ivr2").value);return S.pts.filter(p=>/^\d+$/.test(String(p.n))&&(a===null||+p.n>=a)&&(b===null||+p.n<=b))}return S.pts.filter(p=>CK.has(p.id))};
 const ivOff=o=>Math.abs(o)<5e-5?"0.000":(o>=0?"右 ":"左 ")+f(Math.abs(o),3);
 function ivUi(){const e=$("ivl");if(!e)return;const v=$("ivt").value,n=ivTargets().length;$("ivrw").style.display=v=="rng"?"":"none";
- e.innerHTML=LA?`使う線形: <b>${esc(($("rtn").value||"名前なし").trim())}</b>(延長 ${f(LA.send-LA.s0,2)} m)`:`<span style="color:var(--er,#c0392b)">線形がまだ計算されていません。線形作成タブで線形を計算するか、右上の「線形」で選んでください</span>`;
+ e.innerHTML=LA?`延長 ${f(LA.send-LA.s0,2)} m`:`<span style="color:var(--er,#c0392b)">線形がまだ計算されていません。線形作成タブで線形を計算するか、右上の「線形」で選んでください</span>`;
  $("ivn").textContent=v=="mp"?(MSEL.size?`地図で選んだ点: ${n}点`:"地図で選んだ点: 0点(地図を開き「選択」を押して、点をタップするか囲んでください)"):v=="all"?`全ての点(${S.pts.length}点)が対象です`:v=="rng"?`点番の範囲: ${n}点`:`座標管理でチェックした点: ${n}点`+(n?"":"(0点です。座標管理の一覧で点にチェックを入れてください)")}
 function ivRun(){$("ive").textContent="";const T=ivTargets();if(!LA||!route.length){$("ive").textContent="先に線形を計算してください(右上の「線形」で選ぶこともできます)";$("ivrc").innerHTML="";$("ivsc").innerHTML="";ctShow();return}
  if(!T.length){$("ive").textContent="対象の点がありません";$("ivrc").innerHTML="";$("ivsc").innerHTML="";ctShow();return}

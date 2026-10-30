@@ -277,7 +277,7 @@ input.qpi{margin-bottom:6px}
 <label>貼り付け(1行1点 / SIMAのA01行もOK)</label><textarea id="it" placeholder="No.1 100.123 200.456 10.5&#10;A,基準点,100.123,200.456,10.5"></textarea>
 <button class="s" id="ii" style="margin-top:6px">貼り付けを取り込む</button>
 <input type="file" id="pf" accept="image/*" hidden><input type="file" id="if1" hidden><input type="file" id="ifc" hidden><input type="file" id="ifp" hidden><div class="m" id="pm2"></div></div>
-<div class="c"><div class="r" style="align-items:center"><h2 id="cn" style="margin:0;flex:2"></h2><button class="s" id="exp">CSV保存</button></div><div class="r" style="margin:8px 0"><button class="s" id="cka">全選択</button><button class="s" id="ckn">全解除</button><button class="s" id="ckd">選択削除(0)</button></div>
+<div class="c"><div class="r" style="align-items:center"><h2 id="cn" style="margin:0;flex:2"></h2><button class="s" id="exp">CSV保存</button><button class="s" id="expsim">SIMA保存</button></div><div class="r" style="margin:8px 0"><button class="s" id="cka">全選択</button><button class="s" id="ckn">全解除</button><button class="s" id="ckd">選択削除(0)</button></div>
 
 <input id="pq" placeholder="点番・点名で検索" style="margin-bottom:8px"><div id="pl"></div></div>
 <div class="c"><h2 id="ft">点を登録</h2>
@@ -567,6 +567,13 @@ $("pl").onchange=e=>{const id=e.target.dataset&&e.target.dataset.c;if(id){e.targ
 $("cka").onclick=()=>{visPts().forEach(p=>CK.add(p.id));rPts()};$("pq").oninput=rPts;$("ckn").onclick=()=>{CK.clear();rPts()};
 $("ckd").onclick=()=>ask($("ckd"),`もう一度で${CK.size}件を削除`,()=>{S.pts=S.pts.filter(p=>!CK.has(p.id));CK.clear();sv();all();toast("チェックした点を削除しました(未チェックの点は残っています)")});
 $("exp").onclick=()=>saveCSV(S.pts,"points");
+/* 座標管理の点を SIMA(.sim) で書き出す。Shift_JIS(日本語の点名もそのまま)。チェックした点があればそれだけ、なければ全て */
+let _sjm=null;function sjisBytes(str){if(!_sjm){_sjm=new Map();try{const d=new TextDecoder("shift_jis");for(let a=0x81;a<=0xFC;a++){if(a>0x9F&&a<0xE0)continue;for(let b=0x40;b<=0xFC;b++){if(b==0x7F)continue;const ch=d.decode(new Uint8Array([a,b]));if(ch.length==1&&ch!=="\uFFFD"&&!_sjm.has(ch))_sjm.set(ch,[a,b])}}}catch(e){}}
+ const o=[];for(const ch of String(str)){const c=ch.codePointAt(0);if(c<0x80)o.push(c);else if(c>=0xFF61&&c<=0xFF9F)o.push(c-0xFEC0);else if(_sjm.has(ch))o.push(..._sjm.get(ch));else o.push(0x3F)}return new Uint8Array(o)}
+const simaPts=rows=>{const cl=x=>String(x==null?"":x).replace(/[,\r\n]/g,"_");return`G00,01,${cl(S.site||"SITE")},\r\nZ00,COORDINATE DATA,\r\nA00,\r\n`+rows.map((p,i)=>`A01,${cl(p.n||i+1)},${cl(p.m||"")},${f(p.x,4)},${f(p.y,4)},${f(p.z||0,4)},\r\n`).join("")+"A99,\r\n"};
+$("expsim").onclick=async()=>{const rows=CK.size?S.pts.filter(p=>CK.has(p.id)):S.pts;if(!rows.length){toast("書き出す点がありません");return}
+ const d=new Date(),p2=n=>String(n).padStart(2,"0"),fn=`${(S.site||"現場").replace(/[\\\/:*?"<>|\s]/g,"_")}_座標_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}.sim`;
+ const ok=await saveBlob(new Blob([sjisBytes(simaPts(rows))],{type:"application/octet-stream"}),fn);if(ok)toast(`${rows.length}点をSIMAで保存しました`)};
 const isN=x=>x!==""&&!isNaN(+x);
 function parseLines(txt){const rows=[];txt.normalize("NFKC").split(/\r?\n/).forEach(l=>{const t=l.split(/[,\t\s、]+/).filter(Boolean);let i=t.length;while(i>0&&isN(t[i-1]))i--;const h=t.slice(0,i),v=t.slice(i).map(Number);let n,m="",x,y,z=0;
  if(!h.length){if(v.length==2){[x,y]=v;n="P"+(S.pts.length+rows.length+1)}else if(v.length==3){n=t[0];x=v[1];y=v[2]}else if(v.length>=4){n=t[0];x=v[1];y=v[2];z=v[3]}else return}
@@ -984,8 +991,8 @@ function cadDraw(){if(!CADON)return;cadSize();const c=cc,cs=getComputedStyle(doc
   CADC.forEach(it=>{if(it.t!="pt")return;const q=toS(it.y,it.x);c.fillStyle=CALCC;c.strokeStyle="#fff";c.lineWidth=1.5;c.beginPath();if(it.k=="res"){c.rect(q[0]-5,q[1]-5,10,10);c.fill();c.stroke()}else{c.arc(q[0],q[1],4,0,7);c.stroke();c.strokeStyle=CALCC;c.beginPath();c.arc(q[0],q[1],3.5,0,7);c.stroke()}
    if(it.n){c.font=(it.k=="res"?"bold ":"")+"11px sans-serif";c.fillStyle=CALCC;c.fillText(it.n,q[0]+8,q[1]-7);c.font="10px sans-serif"}});c.restore()}
  const occ=new Set(),on=(x,y)=>x>-20&&y>-20&&x<W+20&&y<H+20,lbl=(t,x,y,cl)=>{if(!lab||!t)return;const F=TSF();const k=Math.round(x/Math.max(46*F,Math.ceil(String(t).length*6.2*F)))+","+Math.round(y/(12*F));if(occ.has(k))return;occ.add(k);c.fillStyle=cl;c.font=Math.round(10*F*10)/10+"px sans-serif";c.fillText(t,x+5,y-4);c.font="10px sans-serif"};
- (route||[]).forEach(r=>{const q=toS(r.y,r.x);if(!on(q[0],q[1]))return;const off=/-[LR]\d/.test(r.n),key=!off&&!/^No\./.test(r.n);
-  c.strokeStyle=col("--ac");c.fillStyle=col("--ac");c.lineWidth=1.5;if(off)c.strokeRect(q[0]-2,q[1]-2,4,4);else c.fillRect(q[0]-(key?3:2),q[1]-(key?3:2),key?6:4,key?6:4);if(key)lbl(r.n,q[0],q[1],col("--ac"))});
+ let stI=0;(route||[]).forEach(r=>{const off0=/-[LR]\d/.test(r.n);if(!off0)stI++;const q=toS(r.y,r.x);if(!on(q[0],q[1]))return;const off=off0,key=!off&&!/^No\./.test(r.n);
+  c.strokeStyle=col("--ac");c.fillStyle=col("--ac");c.lineWidth=1.5;if(off)c.strokeRect(q[0]-2,q[1]-2,4,4);else c.fillRect(q[0]-(key?3:2),q[1]-(key?3:2),key?6:4,key?6:4);if(!off){if(key||(LA&&LA.pitch>0&&(stI-1)%Math.max(1,Math.ceil(48*TSF()/(LA.pitch*V.s)))==0))lbl(r.n,q[0],q[1],col("--ac"))}});
  c.strokeStyle=col("--tx");c.lineWidth=1.2;
  S.pts.forEach(p=>{const q=toS(p.y,p.x);if(!on(q[0],q[1]))return;c.beginPath();c.moveTo(q[0]-3,q[1]);c.lineTo(q[0]+3,q[1]);c.moveTo(q[0],q[1]-3);c.lineTo(q[0],q[1]+3);c.stroke();lbl(lab==1?p.n:lab==2?(p.m||p.n):(p.m&&p.m!==p.n?`${p.n}：${p.m}`:p.n),q[0],q[1],col("--tx"))});
  pltDraw(c);const su=getSetup(),tg=getTarget(),RED="#e53935",GRN="#2e9e5b",lab2=(t,x,y,cl)=>{c.font="bold 12px sans-serif";c.fillStyle=cl;c.fillText(t,x+10,y-8);c.font="10px sans-serif"};

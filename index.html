@@ -438,7 +438,7 @@ input.qpi{margin-bottom:6px}
 <div class="c" id="sus"></div></section>
 <section id="t8" class="sec">
 <div id="ctabs"><button data-k="a" class="on">座標計算</button><button data-k="b">移動・回転</button><button data-k="c">線形オフセット</button><button data-k="d">後方交会</button><button data-k="e">逆幅杭</button></div>
-<div class="c" data-ct="a"><h2>座標計算</h2><label>計算の種類</label><select id="cta"></select><div id="cff"></div><button class="p" id="ctgo" style="width:100%;margin-top:12px">計算</button><div class="e" id="cte"></div></div>
+<div class="c" data-ct="a"><h2>座標計算</h2><label>計算の種類</label><select id="cta"></select><div id="cff"></div><div class="r" style="margin-top:12px"><button class="p" id="ctgo" style="flex:3">計算</button><button id="ctclr" style="flex:1">クリア</button></div><div class="e" id="cte"></div></div>
 <div class="c" data-ct="a" data-r="1" id="ctrc" style="display:none"></div>
 <div class="c" data-ct="b"><h2>移動・回転・縮尺・2点合わせ</h2><label>変換の種類</label><select id="ctb"><option value="mv">水平移動</option><option value="rt">回転</option><option value="sc">縮尺</option><option value="hm">2点合わせ(座標変換)</option></select><div id="cbf"></div>
 <label>対象の点</label><select id="cbt"><option value="ck">座標管理でチェックした点</option><option value="all">全ての点</option><option value="rng">点番の範囲で指定</option></select><div class="r" id="cbrw" style="display:none;margin-top:6px"><div class="cf"><small>点番(から)</small><input class="n" id="cbr1" inputmode="numeric" placeholder="例: 101"></div><div class="cf"><small>点番(まで)</small><input class="n" id="cbr2" inputmode="numeric" placeholder="例: 120"></div></div><div class="m" id="cbn" style="margin-top:4px"></div>
@@ -946,7 +946,7 @@ $("sitenew").onclick=()=>{backup();FH=null;resetWork();S.vps=[];S.vpi=0;S.pts=[]
 
 /* ===== 図(CAD風プロット): 登録点・線形・測点・幅杭 ===== */
 let CADR=null,CADON=false,CADT=null,CADC=null;
-let SELM=false,SELB=null;const MSEL=new Set();const TSF=()=>({S:.75,M:1,L:1.4})[(S.tsz)||"M"],TSN={S:"小",M:"中",L:"大"};const cv=$("cv"),cc=cv.getContext("2d"),V={x:0,y:0,s:1,init:false},ptr=new Map();let W=300,H=200,lab=3,csel=null;
+let SELM=false,SELB=null,MPICK=null;const MSEL=new Set();const TSF=()=>({S:.75,M:1,L:1.4})[(S.tsz)||"M"],TSN={S:"小",M:"中",L:"大"};const cv=$("cv"),cc=cv.getContext("2d"),V={x:0,y:0,s:1,init:false},ptr=new Map();let W=300,H=200,lab=3,csel=null;
 const niceN=v=>{const p=Math.pow(10,Math.floor(Math.log10(v))),k=[1,2,5,10].find(k=>k*p>=v);return k*p};
 const toS=(wx,wy)=>[W/2+(wx-V.x)*V.s,H/2-(wy-V.y)*V.s],toW=(sx,sy)=>[V.x+(sx-W/2)/V.s,V.y-(sy-H/2)/V.s];
 function cadSize(){const r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1;W=r.width||300;H=r.height||200;cv.width=W*d;cv.height=H*d;cc.setTransform(d,0,0,d,0,0)}
@@ -1014,7 +1014,9 @@ function cadDraw(){if(!CADON)return;cadSize();const c=cc,cs=getComputedStyle(doc
 function selUi(){const b=$("cmsel");b.textContent=SELM?`選択中:${MSEL.size}点`:(MSEL.size?`選択:${MSEL.size}点`:"選択:切");b.classList.toggle("on",SELM);
  cadInfo(SELM?`<b>点をタップ、または囲んで選びます</b>(${MSEL.size}点)<br><button data-a="selclr">選択を解除</button><button data-a="seliv">逆幅杭で計算</button>`:"");if(typeof ivUi==="function")ivUi()}
 function cadInfo(h){const e=$("cinfo");e.style.display=h?"block":"none";e.innerHTML=h||""}
-function cadTap(sx,sy){if(SELM){let b=null,bd=24;S.pts.forEach(p=>{const q=toS(p.y,p.x),d=Math.hypot(q[0]-sx,q[1]-sy);if(d<bd){bd=d;b=p}});if(b){MSEL.has(b.id)?MSEL.delete(b.id):MSEL.add(b.id);selUi();cadDraw()}return}
+function cadTap(sx,sy){if(MPICK){let b=null,bd=26;S.pts.forEach(p=>{const q=toS(p.y,p.x),d=Math.hypot(q[0]-sx,q[1]-sy);if(d<bd){bd=d;b=p}});if(!b){cadInfo(`<b>点をタップして選んでください</b>(近くに登録点がありません)<br><button data-a="mpx">やめる</button>`);return}
+  const sl=$(MPICK+"_s"),lb=(document.querySelector(`#t8 [data-mp="${MPICK}"]`)||{dataset:{}}).dataset.mpl||"点";if(sl){sl.value=b.id;sl.dispatchEvent(new Event("change",{bubbles:true}))}MPICK=null;csel=b;cadInfo("");cadDraw();toast(`${b.n} を「${lb}」に入れました`);return}
+ if(SELM){let b=null,bd=24;S.pts.forEach(p=>{const q=toS(p.y,p.x),d=Math.hypot(q[0]-sx,q[1]-sy);if(d<bd){bd=d;b=p}});if(b){MSEL.has(b.id)?MSEL.delete(b.id):MSEL.add(b.id);selUi();cadDraw()}return}
  let best=null,bd=20;const cand=[...S.pts.map(p=>({...p,reg:true})),...(route||[]).map(r=>({n:r.n,m:r.m,x:r.x,y:r.y,z:null,reg:false}))];
  cand.forEach(p=>{const q=toS(p.y,p.x),d=Math.hypot(q[0]-sx,q[1]-sy);if(d<bd){bd=d;best=p}});
  if(best){csel=best;cadInfo(`<b>${esc(best.n)}</b> ${esc(best.m||"")}<br>X ${f(best.x)}　Y ${f(best.y)}${best.z!=null?"　Z "+f(best.z):""}`+(best.reg?`<br><button data-a="so">器械点</button><button data-a="sb">後視</button><button data-a="st">目標</button><button data-a="go">測設へ</button>`:""))}
@@ -1036,7 +1038,7 @@ $("cpos").onclick=()=>{const m=$("cmenu");m.style.display=m.style.display=="bloc
 $("cmenu").onclick=e=>{const p=e.target.dataset&&e.target.dataset.p;if(!p)return;S.cadpos=p;sv();$("cmenu").style.display="none";cadLayout();setTimeout(cadFit,30)};
 function cadLnUi(){$("cln").textContent=S.cadln===false?"線:非表示":"線:表示"}
 $("cln").onclick=()=>{S.cadln=S.cadln===false;sv();cadLnUi();cadDraw()};
-function cadToggle(on){CADON=on===undefined?!CADON:on;if(CADON)setTimeout(othUpdate,0);$("cad").style.display=CADON?"block":"none";document.body.classList.toggle("cadon",CADON);cadLayout();$("cadbtn").classList.toggle("on",CADON);
+function cadToggle(on){CADON=on===undefined?!CADON:on;if(!CADON)MPICK=null;if(CADON)setTimeout(othUpdate,0);$("cad").style.display=CADON?"block":"none";document.body.classList.toggle("cadon",CADON);cadLayout();$("cadbtn").classList.toggle("on",CADON);
  if(CADON)setTimeout(()=>{if(!V.init||($("t1").classList.contains("on")&&getSetup()&&getTarget())){V.init=true;($("t1").classList.contains("on")&&getSetup()&&getTarget())?cadFitSetup():cadFit()}else cadDraw()},0)}
 $("cadbtn").onclick=()=>cadToggle();$("cx").onclick=()=>cadToggle(false);$("cfit").onclick=cadFit;function cadFitCalc(){cadSize();const a=[];(CADC||[]).forEach(it=>{if(it.t=="pt")a.push([it.y,it.x]);else if(it.t=="line"||it.t=="arrow"){a.push([it.a.y,it.a.x],[it.b.y,it.b.x])}else if(it.t=="circle"){a.push([it.c.y-it.r,it.c.x-it.r],[it.c.y+it.r,it.c.x+it.r])}});if(!a.length){cadFit();return}
  const xs=a.map(q=>q[0]),ys=a.map(q=>q[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);V.y=(y0+y1)/2;V.s=Math.min(5000,Math.min((W-230)/Math.max(x1-x0,6),(H-110)/Math.max(y1-y0,6)));V.x=(x0+x1)/2+75/V.s;cadDraw()}
@@ -1046,7 +1048,7 @@ $("czi").onclick=()=>cadZoom(W/2,H/2,1.5);$("czo").onclick=()=>cadZoom(W/2,H/2,1
  $("cmsel").onclick=()=>{SELM=!SELM;SELB=null;selUi();cadDraw()};
 $("ctsz").onclick=()=>{S.tsz={S:"M",M:"L",L:"S"}[S.tsz||"M"];sv();$("ctsz").textContent="文字:"+TSN[S.tsz];if($("dxs"))$("dxs").value=S.tsz;cadDraw()};$("ctsz").textContent="文字:"+TSN[S.tsz||"M"];
 $("clab").onclick=()=>{lab={3:1,1:2,2:0,0:3}[lab];$("clab").textContent=["なし","点番","点名","点番：点名"][lab];cadDraw()};
-$("cinfo").onclick=e=>{const a=e.target.dataset.a;if(a=="selclr"){MSEL.clear();selUi();cadDraw();return}if(a=="seliv"){goTab(5);ctTab("e");$("ivt").value="mp";ivUi();ivRun();return}if(!a||!csel||!csel.id)return;
+$("cinfo").onclick=e=>{const a=e.target.dataset.a;if(a=="mpx"){MPICK=null;cadInfo("");return}if(a=="selclr"){MSEL.clear();selUi();cadDraw();return}if(a=="seliv"){goTab(5);ctTab("e");$("ivt").value="mp";ivUi();ivRun();return}if(!a||!csel||!csel.id)return;
  if(a=="go"){$("st").value=csel.id;rSt();goTab(2);toast(`${csel.n} を測設の目標にしました`);return}
  $(a).value=csel.id;rSt();toast(`${csel.n} を${{so:"器械点",sb:"後視点",st:"目標点"}[a]}に設定しました`)};
 const stepT=d=>{if(!S.pts.length)return;let i=S.pts.findIndex(p=>p.id===$("st").value);i=i<0?0:(i+d+S.pts.length)%S.pts.length;$("st").value=S.pts[i].id;rSt();if(CADON){csel=S.pts[i];cadDraw()}};
@@ -2441,7 +2443,7 @@ const qpSync=()=>QP.forEach(([sl,i])=>{if(document.activeElement===i)return;cons
 /* ===== 計算タブ: 座標計算 / 移動・回転・縮尺・2点合わせ / 線形オフセット ===== */
 const ctScroll=id=>{const e=$(id);if(e&&e.scrollIntoView&&e.style.display!=="none")setTimeout(()=>e.scrollIntoView({behavior:"smooth",block:"start"}),60)};
 /* ===== 逆幅杭計算(点 → 測点・オフセット)と、法線上の点の断面 ===== */
-let IV=null,IVS={s:null,w:0.5,dl:null,k:1,rem:false,cen:{}},IVC=null;const ivDL=(zs,zc)=>IVS.dl!=null?IVS.dl:Math.floor(Math.min(...zs,...(zc!=null?[zc]:[]))-1);
+let IV=null,IVS={s:null,w:0.5,dl:null,k:1,rem:false,cen:{},ct:0.005},IVC=null;const ivDL=(zs,zc)=>IVS.dl!=null?IVS.dl:Math.floor(Math.min(...zs,...(zc!=null?[zc]:[]))-1);
 function ivPre(){if(!LA)return null;if(IVC&&IVC.la===LA)return IVC;const n=Math.min(8000,Math.max(400,Math.ceil((LA.send-LA.s0)/0.25))),xs=[],X=[],Y=[];for(let i=0;i<=n;i++){const x=LA.s0+(LA.send-LA.s0)*i/n,p=LA.at(x);xs.push(x);X.push(p.x);Y.push(p.y)}IVC={la:LA,xs,X,Y,st:(LA.send-LA.s0)/n};return IVC}
 function invPt(P){const c=ivPre();if(!c)return null;let bi=0,bd=1e300;for(let i=0;i<c.xs.length;i++){const d=(P.x-c.X[i])**2+(P.y-c.Y[i])**2;if(d<bd){bd=d;bi=i}}
  const ds=x=>{const p=LA.at(x);return Math.hypot(P.x-p.x,P.y-p.y)};let lo=Math.max(LA.s0,c.xs[bi]-c.st),hi=Math.min(LA.send,c.xs[bi]+c.st);
@@ -2464,20 +2466,20 @@ async function ivCsv(){if(!IV)return;const csv="﻿点番,点名,X座標,Y座標
  const d=new Date(),p=n=>String(n).padStart(2,"0");await saveBlob(new Blob([csv],{type:"text/csv;charset=utf-8;"}),`逆幅杭_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.csv`,csv)}
 /* 断面: 指定した測点の法線上(測点の差が±幅以内)にある点を拾って、オフセット−標高で描く */
 function ivSecUi(){if(!IV){$("ivsc").innerHTML="";return}
- $("ivsc").innerHTML=`<h2>断面</h2><div class="r"><div class="cf"><small>断面の測点(No.5+3.2 または 追加距離)</small><input id="ivs" value="${esc(stn(IVS.s,LA.pitch))}"></div><div class="cf" style="flex:0 0 96px"><small>拾う幅 ±(m)</small><input class="n" id="ivw" value="${IVS.w}"></div><div class="cf" style="flex:0 0 84px"><small>DL(基準高)</small><input class="n" id="ivd" inputmode="decimal" placeholder="自動" value="${IVS.dl!=null?IVS.dl:""}"></div></div><label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="ivrm" style="width:20px;height:20px;flex:0 0 20px"${IVS.rem?" checked":""}> 横断リストに「備考/記号」(点名・点番)を入れる</label><div id="ivsv" style="margin-top:8px"></div>`;$("ivrm").onchange=()=>{IVS.rem=$("ivrm").checked;ivSection()};
- $("ivs").oninput=()=>{const x=stParse($("ivs").value);if(x!==null&&x>=LA.s0-1e-6&&x<=LA.send+1e-6){IVS.s=x;ivSection()}};$("ivd").oninput=()=>{const d=num($("ivd").value);IVS.dl=$("ivd").value.trim()===""||d===null?null:d;ivSection()};$("ivw").oninput=()=>{const w=num($("ivw").value);if(w!==null&&w>=0){IVS.w=w;ivSection()}};ivSection()}
+ $("ivsc").innerHTML=`<h2>断面</h2><div class="r"><div class="cf"><small>断面の測点(No.5+3.2 または 追加距離)</small><input id="ivs" value="${esc(stn(IVS.s,LA.pitch))}"></div><div class="cf" style="flex:0 0 96px"><small>拾う幅 ±(m)</small><input class="n" id="ivw" value="${IVS.w}"></div><div class="cf" style="flex:0 0 100px"><small>センター判定 ±m</small><input class="n" id="ivct" inputmode="decimal" value="${IVS.ct}"></div><div class="cf" style="flex:0 0 84px"><small>DL(基準高)</small><input class="n" id="ivd" inputmode="decimal" placeholder="自動" value="${IVS.dl!=null?IVS.dl:""}"></div></div><label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="ivrm" style="width:20px;height:20px;flex:0 0 20px"${IVS.rem?" checked":""}> 横断リストに「備考/記号」(点名・点番)を入れる</label><div id="ivsv" style="margin-top:8px"></div>`;$("ivrm").onchange=()=>{IVS.rem=$("ivrm").checked;ivSection()};
+ $("ivs").oninput=()=>{const x=stParse($("ivs").value);if(x!==null&&x>=LA.s0-1e-6&&x<=LA.send+1e-6){IVS.s=x;ivSection()}};$("ivct").oninput=()=>{const c=num($("ivct").value);if(c!==null&&c>=0){IVS.ct=c;ivSection()}};$("ivd").oninput=()=>{const d=num($("ivd").value);IVS.dl=$("ivd").value.trim()===""||d===null?null:d;ivSection()};$("ivw").oninput=()=>{const w=num($("ivw").value);if(w!==null&&w>=0){IVS.w=w;ivSection()}};ivSection()}
 /* 横断図: 赤い折れ線 + 左から番号の引き出し線(番号は横断データリストのNOと同じ)。文字が重ならない位置を探して置く */
 function ivLead(pts,h,cw){const n=pts.length;if(!n)return[];const mx=String(n).length,tw=cw*mx+.5*h,sp=tw+.7*h,Yb=Math.max(...pts.map(p=>p.y))+1.0*h,T=Yb+1.6*h,hh=1.05*h;
  /* 番号は点の順(左から)に1段で並べる。間隔を確保しつつ、元の位置にできるだけ近づける(単調回帰)ので、線は交差しない */
  const u=pts.map((p,i)=>p.x-i*sp),bl=[];u.forEach(v=>{bl.push({s:v,c:1});while(bl.length>1&&bl[bl.length-2].s/bl[bl.length-2].c>bl[bl.length-1].s/bl[bl.length-1].c){const b=bl.pop(),a=bl.pop();bl.push({s:a.s+b.s,c:a.c+b.c})}});
  const t=[];bl.forEach(b=>{for(let k=0;k<b.c;k++)t.push(b.s/b.c)});
  return pts.map((p,i)=>{const tx=t[i]+i*sp;return{px:p.x,py:p.y,bx:p.x,by:Yb,tx,ty:T,x0:tx-tw/2,x1:tx+tw/2,t:String(i+1),b:[tx-tw/2,T,tx+tw/2,T+hh]}})}
-const ivGH=P=>{for(let i=0;i<P.length;i++){if(Math.abs(P[i].off)<5e-5)return P[i].z;if(i&&P[i-1].off<0&&P[i].off>0)return P[i-1].z+(P[i].z-P[i-1].z)*(0-P[i-1].off)/(P[i].off-P[i-1].off)}return null};
+const ivGH=(P,tol)=>{tol=tol>0?tol:5e-5;for(let i=0;i<P.length;i++){if(Math.abs(P[i].off)<=tol)return P[i].z;if(i&&P[i-1].off<0&&P[i].off>0)return P[i-1].z+(P[i].z-P[i-1].z)*(0-P[i-1].off)/(P[i].off-P[i-1].off)}return null};
 function ivSection(){const box=$("ivsv");if(!box||!IV)return;const s0=IVS.s,w=IVS.w;let P=IV.rows.filter(r=>Math.abs(r.s-s0)<=w+1e-9).sort((a,b)=>a.off-b.off);const zf=zFn(),zc=zf?zf(s0):null;
  /* センター(オフセット0)に点が2つ以上あるときは、使う点を選べる。初期値は「高さがある点」 */
- const cen=P.filter(r=>Math.abs(r.off)<0.01),ck=s0.toFixed(3);let cpick="";if(cen.length>=2){const sv_=IVS.cen[ck],pk=cen.find(r=>r.id===sv_)||cen.find(r=>Math.abs(r.z)>1e-9)||cen[0];cpick=`<label style="display:block;margin:6px 0 2px">センターに${cen.length}点あります。使う点</label><select id="ivcp">${cen.map(r=>`<option value="${esc(r.id)}"${r===pk?" selected":""}>${esc(r.n)}${r.m?" "+esc(r.m):""}(地盤高 ${f(r.z,3)})</option>`).join("")}</select>`;P=P.filter(r=>!cen.includes(r)||r===pk)}
+ const cen=P.filter(r=>Math.abs(r.off)<=IVS.ct+1e-12),ck=s0.toFixed(3);let cpick="";if(cen.length>=2){const sv_=IVS.cen[ck],pk=cen.find(r=>r.id===sv_)||cen.find(r=>Math.abs(r.z)>1e-9)||cen[0];cpick=`<label style="display:block;margin:6px 0 2px">センターに${cen.length}点あります。使う点</label><select id="ivcp">${cen.map(r=>`<option value="${esc(r.id)}"${r===pk?" selected":""}>${esc(r.n)}${r.m?" "+esc(r.m):""}(地盤高 ${f(r.z,3)})</option>`).join("")}</select>`;P=P.filter(r=>!cen.includes(r)||r===pk)}
  if(!P.length){box.innerHTML=`<div class="m">${esc(stn(s0,LA.pitch))} の法線上(±${f(w,2)} m)に、点がありません。「拾う幅」を広げるか、行をタップして測点を選んでください</div>`;return}
- const zs=P.map(r=>r.z),zOk=zs.some(v=>Math.abs(v)>1e-9),DL=ivDL(zs,zc),gh=ivGH(P),W=340,pl=24,pr=14,ox=P.map(r=>r.off);
+ const zs=P.map(r=>r.z),zOk=zs.some(v=>Math.abs(v)>1e-9),DL=ivDL(zs,zc),gh=ivGH(P,IVS.ct),W=340,pl=24,pr=14,ox=P.map(r=>r.off);
  let x0=Math.min(0,...ox),x1=Math.max(0,...ox);if(x1-x0<2){const c=(x0+x1)/2;x0=c-1;x1=c+1}const mx=(x1-x0)*0.1;x0-=mx;x1+=mx;
  const sx=(W-pl-pr)/(x1-x0),X=o=>pl+(o-x0)*sx,Yu=z=>(z-DL)*sx,TH=10,pts=P.map(r=>({x:X(r.off),y:Yu(r.z)})),ld=ivLead(pts,TH,6.5);
  const zTop=Math.max(...pts.map(p=>p.y),zc!=null?Yu(zc):-1e9,ld.length?Math.max(...ld.map(l=>l.b[3])):0),hd=[`${stn(s0,LA.pitch)}`,`L=${f(s0,3)}`,gh!=null?`GH=${f(gh,3)}`:"",zc!=null?`FH=${f(zc,3)}`:""].filter(Boolean),
@@ -2496,7 +2498,7 @@ const ivFn=(s0,pre,ext)=>`${pre}_${String(stn(s0,LA.pitch)).replace(/[\\\/:*?"<>
 async function ivListCsv(rows,s0,zc,DL){const nm=($("rtn").value||"").trim(),csv="﻿線形,測点,追加距離,計画高,DL,NO,横断距離L(左-/右+),地盤高H"+(IVS.rem?",点番,点名":"")+"\n"+rows.map(r=>[q(nm),q(stn(s0,LA.pitch)),f(s0,3),zc!=null?f(zc,3):"",f(DL,3),r.no,f(r.off,3),f(r.z,3),...(IVS.rem?[q(String(r.n)),q(r.m||"")]:[])].join(",")).join("\n")+"\n";
  await saveBlob(new Blob([csv],{type:"text/csv;charset=utf-8;"}),ivFn(s0,"横断現況データリスト","csv"),csv)}
 async function ivListPdf(rows,s0){await savePdf({title:"横断現況データリスト",sub:[`測点　${stn(s0,LA.pitch)}`,"距離表示・・・L側−、R側＋"],blocks:[{h:"",cols:[{h:"NO",w:140,al:"r"},{h:"横断距離 L",w:260,al:"r"},{h:"地盤高 H",w:260,al:"r"},...(IVS.rem?[{h:"備考/記号",w:560,al:"l"}]:[])],rows:rows.map(r=>[String(r.no),f(r.off,3),f(r.z,3),...(IVS.rem?[(r.m||"")+(r.m&&r.n?" ":"")+(r.n?"(点番 "+r.n+")":"")]:[])])}]},ivFn(s0,"横断現況データリスト","pdf"))}
-async function ivDxf(P,s0,zc,DL){const sw=!!(S.dxo&&S.dxo.sw),gh=ivGH(P),all=P.map(r=>({x:sw?r.off:r.z,y:sw?r.z:r.off}));all.push({x:sw?0:DL,y:sw?DL:0});
+async function ivDxf(P,s0,zc,DL){const sw=!!(S.dxo&&S.dxo.sw),gh=ivGH(P,IVS.ct),all=P.map(r=>({x:sw?r.off:r.z,y:sw?r.z:r.off}));all.push({x:sw?0:DL,y:sw?DL:0});
  const D=dxfNew(all),h=D.h,cw=.8*h,pts=P.map(r=>({x:r.off,y:r.z})),ld=ivLead(pts,h,cw),ox=P.map(r=>r.off),a=Math.min(0,...ox,...ld.map(l=>l.x0))-3*h,b=Math.max(0,...ox,...ld.map(l=>l.x1))+3*h;
  const top=Math.max(...P.map(r=>r.z),zc!=null?zc:-1e9,...ld.map(l=>l.b[3]));
  D.L("SEC_DL",[a,DL],[b,DL]);D.T("SEC_DLTXT",[a,DL+.25*h],"DL="+f(DL,3));D.L("SEC_CL",[0,DL],[0,top]);
@@ -2508,7 +2510,7 @@ async function ivDxf(P,s0,zc,DL){const sw=!!(S.dxo&&S.dxo.sw),gh=ivGH(P),all=P.m
  await dxfSave(D,"断面_"+String(stn(s0,LA.pitch)).replace(/[\\\/:*?"<>|\s]/g,"_"));toast("断面をDXFで保存しました")}
 const ctShow=()=>{const k=document.querySelector("#ctabs button.on").dataset.k;document.querySelectorAll("#t8 [data-ct]").forEach(c=>{c.style.display=c.dataset.ct==k&&(!c.dataset.r||c.innerHTML.trim()!=="")?"":"none"})};
 const ctTab=k=>{if(k=="e")ivUi();document.querySelectorAll("#ctabs button").forEach(b=>b.classList.toggle("on",b.dataset.k==k));rsMove(k=="d"?"calc":"inst");if(k=="d")rRs();if(k=="b")cbCount();ctShow()};
-const _pt=(id,l)=>`<label>${l}</label><div class="r"><input class="qpi" data-qp="${id}" inputmode="numeric" placeholder="点番" style="flex:.55;margin-bottom:0"><select id="${id}_s" data-pp="${id}" style="flex:1.45"></select></div><div class="r" style="margin-top:6px"><div class="cf"><small>X(北)</small><input class="n" id="${id}_x" inputmode="decimal"></div><div class="cf"><small>Y(東)</small><input class="n" id="${id}_y" inputmode="decimal"></div></div>`;
+const _pt=(id,l)=>`<div class="r" style="align-items:center;margin-bottom:2px"><label style="flex:1;margin:0">${l}</label><button type="button" class="s" data-mp="${id}" data-mpl="${l}" style="flex:0 0 auto;min-height:32px;padding:2px 12px">地図で選ぶ</button></div><div class="r"><input class="qpi" data-qp="${id}" inputmode="numeric" placeholder="点番" style="flex:.55;margin-bottom:0"><select id="${id}_s" data-pp="${id}" style="flex:1.45"></select></div><div class="r" style="margin-top:6px"><div class="cf"><small>X(北)</small><input class="n" id="${id}_x" inputmode="decimal"></div><div class="cf"><small>Y(東)</small><input class="n" id="${id}_y" inputmode="decimal"></div></div>`;
 const _num=(id,l,ph)=>`<label>${l}</label><input class="n" id="${id}" inputmode="decimal" placeholder="${ph||""}">`;
 const _dms=(id,l)=>`<label>${l}</label><div class="r"><div class="cf"><small>度</small><input class="n" id="${id}_d"></div><div class="cf"><small>分</small><input class="n" id="${id}_m"></div><div class="cf"><small>秒</small><input class="n" id="${id}_s2"></div></div>`;
 const _sel=(id,l,o)=>`<label>${l}</label><select id="${id}">${o.map(([v,t])=>`<option value="${v}">${t}</option>`).join("")}</select>`;
@@ -2552,6 +2554,9 @@ const CTT=[
 let CTP=[];
 function ctMap(items){CADC=items&&items.length?items:null;if(CADON){CADC?cadFitCalc():cadDraw()}}
 function ctForm(){CADC=null;if(CADON)cadDraw();const t=CTT[+$("cta").value||0];$("cff").innerHTML=t.form();$("ctrc").innerHTML="";$("cte").textContent="";ctSel();ctShow()}
+$("ctclr").onclick=()=>{ctForm();toast("入力と結果をクリアしました")};
+/* 入力を変えたら、古い結果と地図の線は消す(古い線が残らないように) */
+["input","change"].forEach(ev=>$("cff").addEventListener(ev,()=>{if(!CADC&&!$("ctrc").innerHTML.trim())return;CADC=null;$("ctrc").innerHTML="";$("cte").textContent="";if(CADON)cadDraw();ctShow()}));
 function ctRun(){const t=CTT[+$("cta").value||0],r=t.run();$("cte").textContent=r.err||"";if(r.err){$("ctrc").innerHTML="";ctShow();return}
  CTP=r.pts;ctMap((r.draw||[]).concat(r.pts.map(q=>dP(q,q.m,"res"))));$("ctrc").innerHTML=`<h2>結果</h2>${r.rows.join("")}`+(CTP.length?`<label>点名</label><input id="ctnm" value="${esc(CTP[0].m)}"><button class="p" id="ctreg" style="width:100%;margin-top:8px">座標管理に登録(${CTP.length}点)</button>`:"");ctShow();ctScroll("ctrc");
  if($("ctreg"))$("ctreg").onclick=()=>{const nm=$("ctnm").value.trim()||CTP[0].m;toast(addPts(CTP.map((p,i)=>({n:"",m:CTP.length>1?`${nm}${i+1}`:nm,x:p.x,y:p.y,z:p.z||0}))))}}
@@ -2603,6 +2608,7 @@ function ctInit(){$("cta").innerHTML=CTT.map((t,i)=>`<option value="${i}">${t.n}
  document.querySelectorAll("#ctabs button").forEach(b=>b.onclick=()=>ctTab(b.dataset.k));$("ivt").onchange=()=>{ivUi()};["ivr1","ivr2"].forEach(i=>$(i).oninput=ivUi);$("ivgo").onclick=ivRun;$("ivrc").onclick=e=>{const tr=e.target.closest("tr[data-i]");if(!tr||!IV)return;const r=IV.rows[+tr.dataset.i];IVS.s=r.s;ivSecUi();const sc=$("ivsc");if(sc.scrollIntoView)sc.scrollIntoView({block:"nearest"})};$("cta").onchange=ctForm;$("ctgo").onclick=ctRun;$("ctb").onchange=cbForm;$("cbgo").onclick=cbRun;$("cbt").onchange=cbCount;["cbr1","cbr2"].forEach(i=>$(i).addEventListener("input",cbCount));$("cogo").onclick=coRun;
  $("t8").addEventListener("input",e=>{const t=e.target;if(!t||!t.dataset||!t.dataset.qp)return;const id=t.dataset.qp,v=t.value.trim(),q=S.pts.find(r=>String(r.n)===v);if(q){$(id+"_s").value=q.id;$(id+"_x").value=f(q.x,4);$(id+"_y").value=f(q.y,4);t.style.borderColor=""}else t.style.borderColor=v?"#e11d48":""});
  $("t8").addEventListener("keydown",e=>{if(e.key!=="Enter"||!e.target||e.target.tagName!=="INPUT")return;const card=e.target.closest&&e.target.closest(".c"),go=card&&card.querySelector("button.p[id$=go]");if(go){e.preventDefault();go.click()}});
+ $("t8").addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-mp]");if(!b)return;MPICK=b.dataset.mp;SELM=false;try{selUi()}catch(_){}cadToggle(true);cadInfo(`<b>地図で、「${esc(b.dataset.mpl||"点")}」にする点をタップしてください</b><br><button data-a="mpx">やめる</button>`);toast("地図で点をタップしてください")});
  $("t8").addEventListener("change",e=>{const t=e.target;if(!t||!t.dataset)return;if(t.dataset.pp){const q=S.pts.find(r=>r.id===t.value),id=t.dataset.pp;if(q){$(id+"_x").value=f(q.x,4);$(id+"_y").value=f(q.y,4);const qi=document.querySelector(`#t8 [data-qp="${id}"]`);if(qi){qi.value=q.n;qi.style.borderColor=""}}}
   else if(t.dataset.lm){const p=t.dataset.lm;$(p+"_w2").style.display=t.value=="2"?"":"none";$(p+"_wa").style.display=t.value=="a"?"":"none"}
   else if(t.id=="mv_m"){$("mv_d").style.display=t.value=="d"?"":"none";$("mv_a").style.display=t.value=="a"?"":"none"}});

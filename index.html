@@ -462,11 +462,20 @@ input.qpi{margin-bottom:6px}
 <div id="toast"></div><button id="pm">±</button>
 <nav><button data-t="6"><i data-ic="folder"></i><span>ジョブ</span></button><button class="on" data-t="0"><i data-ic="pin"></i><span>座標管理</span></button><button data-t="1"><i data-ic="inst"></i><span>器械設置</span></button><button data-t="2"><i data-ic="target"></i><span>測設</span></button><button data-t="3"><i data-ic="curve"></i><span>線形作成</span></button><button data-t="4"><i data-ic="poly"></i><span>基準点</span></button><button data-t="5"><i data-ic="calc"></i><span>計算</span></button></nav>
 
-<script>
+<script id="appjs" type="text/plain">
 const KEY="field_v2",$=i=>document.getElementById(i);
 let S={pts:[],lv:[],el:[],ep:[],routes:[],site:"",tr:[],vp:[],rs:[],results:[],cs:{},mp:[]},ed=null;
-try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
-const sv=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+try{Object.assign(S,JSON.parse(window.__BOOT||"{}"))}catch(e){}
+/* 保存: 容量の大きい IndexedDB に保存する(localStorage は5MB前後で、点が多いと保存に失敗して再起動で消えていた)。使えない環境では localStorage に保存 */
+let _svT=null,_svDirty=false,_svWarned=false;
+const svWarn=()=>{if(_svWarned)return;_svWarned=true;try{toast("この端末への自動保存に失敗しました(容量不足の可能性)。「ジョブ」で現場ファイルに保存してください")}catch(e){}};
+function svNow(){_svDirty=false;let j;try{j=JSON.stringify(S)}catch(e){return}
+ const I=window.__idb;
+ if(I&&I.ok){I.set("S",j).then(ok=>{if(!ok){try{localStorage.setItem(KEY,j)}catch(e){svWarn()}return}
+   if(!I.flag){I.set("LIB",JSON.stringify(LIBC)).then(o2=>{if(o2){try{localStorage.setItem("field_idb","1");I.flag=true;localStorage.removeItem(KEY);localStorage.removeItem(LIB)}catch(e){}}})}})}
+ else{try{localStorage.setItem(KEY,j)}catch(e){svWarn()}}}
+const sv=()=>{const I=window.__idb;if(!(I&&I.ok)){svNow();return}_svDirty=true;clearTimeout(_svT);_svT=setTimeout(svNow,300)};
+window.addEventListener("pagehide",()=>{if(_svDirty)svNow()});document.addEventListener("visibilitychange",()=>{if(document.hidden&&_svDirty)svNow()});
 const num=s=>{s=String(s).trim().replace(",",".");return s===""||isNaN(+s)?null:+s};
 const f=(v,d=3)=>{if(!isFinite(v))return v.toFixed(d);const e=Math.pow(10,d),x=Math.abs(v)*e,r=Math.floor(x+0.5+x*1e-13);return((v<0&&r>0?-r:r)/e).toFixed(d)},   /* 四捨五入(ちょうど半分は切り上げ)。-0.000 とは出さない */
 esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -903,17 +912,18 @@ $("rts").onclick=()=>{const name=$("rtn").value.trim();if(!name){toast("線形�
 $("rtl").onclick=()=>{const r=S.routes.find(x=>x.id===$("rtsel").value);if(!r)return;loadRt(r);$("rtm").textContent=`「${r.name}」を読み込みました`};
 $("rtd").onclick=()=>{const r=S.routes.find(x=>x.id===$("rtsel").value);if(!r)return;ask($("rtd"),"もう一度で削除",()=>{S.routes=S.routes.filter(x=>x!==r);sv();rRt();$("rtm").textContent=`「${r.name}」を削除しました`})};
 
-const LIB="field_lib_v1",libGet=()=>{try{return JSON.parse(localStorage.getItem(LIB)||"{}")}catch(e){return{}}};
+const LIB="field_lib_v1";let LIBC=window.__LIB||(()=>{try{return JSON.parse(localStorage.getItem(LIB)||"{}")}catch(e){return{}}})();const libGet=()=>LIBC;
+async function libSave(l){LIBC=l;const I=window.__idb;if(I&&I.ok){const ok=await I.set("LIB",JSON.stringify(l));if(ok)return true}try{localStorage.setItem(LIB,JSON.stringify(l));return true}catch(e){return false}}
 function rLib(){const l=libGet(),ks=Object.keys(l).sort((a,b)=>String(l[b].t||"").localeCompare(String(l[a].t||"")));
  $("sitelib").innerHTML=ks.length?ks.map(k=>{let info="";try{const d=JSON.parse(l[k].d);info=`点${(d.pts||[]).length}・線形${(d.routes||[]).length}`}catch(e){}
   let t="";try{t=new Date(l[k].t).toLocaleString("ja-JP",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}catch(e){}
   const cur=S.site===k;
   return`<div class="pt"${cur?' style="background:color-mix(in srgb,var(--ac) 10%,transparent);border-radius:3px;padding-left:8px;padding-right:8px"':""}><div data-lo="${esc(k)}" style="flex:1;min-width:0;cursor:pointer;padding:4px 0"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k)}${cur?"(いま開いている現場)":""}</b><small class="m" style="display:block">${esc(t)}　${info}</small></div><button class="s" data-lo="${esc(k)}" style="min-width:56px;min-height:40px">開く</button><button class="s" data-ld="${esc(k)}" style="min-width:56px;min-height:40px">削除</button></div>`}).join(""):`<div class="m" style="padding:10px 0">保存した現場はまだありません。「上書き保存」で保存できます。</div>`}
 $("sitelib").onclick=e=>{const d=e.target.closest("[data-ld]"),o=e.target.closest("[data-lo]");
- if(d){const k=d.dataset.ld;ask(d,"もう一度で削除",()=>{const l=libGet();delete l[k];try{localStorage.setItem(LIB,JSON.stringify(l))}catch(_){}rLib();toast(`「${k}」を一覧から削除しました(保存したファイルは残ります)`)});return}
+ if(d){const k=d.dataset.ld;ask(d,"もう一度で削除",()=>{const l=libGet();delete l[k];libSave(l);rLib();toast(`「${k}」を一覧から削除しました(保存したファイルは残ります)`)});return}
  if(o){const k=o.dataset.lo,l=libGet();if(l[k]&&openSite(l[k].d))toast(`「${k}」を開きました`)}};
 let SAVEAS=false;$("siteovw").onclick=async()=>{const nm=$("sitename").value.trim();if(!nm){toast("現場名を入力してください");return}const l=libGet();l[nm]={t:new Date().toISOString(),d:siteJson()};
- let m1="この端末に上書き保存しました";try{localStorage.setItem(LIB,JSON.stringify(l))}catch(e){m1="この端末への保存に失敗しました(容量不足の可能性)"}S.site=nm;sv();rLib();$("sitelib").value=nm;
+ let m1="この端末に上書き保存しました";if(!await libSave(l))m1="この端末への保存に失敗しました(容量不足の可能性)";S.site=nm;sv();rLib();$("sitelib").value=nm;
  const m2=await saveSiteFile();$("sitemsg").textContent=`${m1} / ${m2}`;toast(`「${nm}」を${SAVEAS?"名前を付けて":"上書き"}保存しました`);SAVEAS=false};
 const siteJson=()=>JSON.stringify({app:"genba-sokuryo",v:1,site:$("sitename").value.trim(),saved:new Date().toISOString(),pts:S.pts,routes:S.routes,lv:S.lv,ep:S.ep,vp:S.vp,mp:S.mp,tr:S.tr,trs:S.trs||[],trc:trCur(),rs:S.rs,results:S.results||[],cs:S.cs||{},sord:S.sord||null,tnl:S.tnl||{},lcd:S.lcd||null,lcs:S.lcs||null,tnr:S.tnr||[],tnc:S.tnc!==false,kd:S.kd||null,stmode:S.stmode||"no",rsd:S.rsd||"2",mpsta:!!S.mpsta,plt:S.plt||null,dxo:S.dxo||null,cur:curRt()});
 $("askloc").checked=S.askloc!==false;$("askloc").onchange=()=>{S.askloc=$("askloc").checked;sv()};
@@ -2660,4 +2670,20 @@ document.addEventListener("keydown",function(e){if(e.key=="Escape")close()});
 })();
 
 goTab(6);   /* 起動時はジョブ画面から開く */
+</script>
+<script>
+/* 起動: 保存データは IndexedDB(大容量)。旧版の localStorage のデータはそのまま読み、最初の保存で IndexedDB に移す */
+(function(){
+ let db=null;const open=()=>db?Promise.resolve(db):new Promise(res=>{try{const r=indexedDB.open("gensoku",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>{db=r.result;res(db)};r.onerror=()=>res(null);r.onblocked=()=>res(null)}catch(e){res(null)}});
+ const I=window.__idb={ok:false,flag:false,
+  get:async k=>{const d=await open();if(!d)return null;return new Promise(res=>{try{const q=d.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>res(q.result==null?null:q.result);q.onerror=()=>res(null)}catch(e){res(null)}})},
+  set:async(k,v)=>{const d=await open();if(!d)return false;return new Promise(res=>{try{const t=d.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=()=>res(true);t.onerror=()=>res(false);t.onabort=()=>res(false)}catch(e){res(false)}})}};
+ const run=()=>{const e=document.createElement("script");e.textContent=document.getElementById("appjs").textContent;document.head.appendChild(e)};
+ let flag=null;try{flag=localStorage.getItem("field_idb")}catch(e){}
+ if(!flag){try{window.__BOOT=localStorage.getItem("field_v2")}catch(e){}
+  run();open().then(d=>{if(d){I.ok=true;try{if(typeof sv==="function")sv()}catch(e){}}});return}
+ (async()=>{I.flag=true;const d=await open();let s=null,l=null;if(d){I.ok=true;s=await I.get("S");l=await I.get("LIB")}
+  if(s==null){try{s=localStorage.getItem("field_v2")}catch(e){}}
+  window.__BOOT=s;try{window.__LIB=l?JSON.parse(l):null}catch(e){window.__LIB=null}run()})()
+})();
 </script></body></html>
